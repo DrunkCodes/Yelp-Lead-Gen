@@ -26,7 +26,7 @@ Each dataset item contains exactly eight keys:
 | `location` | string | – | Location (e.g. “Seattle, WA”). Required if `searchUrl` omitted. |
 | `searchUrl` | string | – | Direct Yelp search URL. Overrides `keyword`+`location`. |
 | `numBusinesses` | integer | **50** | Max 500. Stops when reached or pages exhausted. |
-| `concurrency` | integer | **12** | Max parallel detail fetches (HTTP & LLM guarded internally). |
+| `concurrency` | integer | **5** | Actor clamps the value between **3 – 5**; governs parallel detail fetches (HTTP & LLM guarded internally). |
 | `naturalNavigation` | boolean | **false** | Start from Google/Bing instead of hitting Yelp directly. |
 | `perBusinessIsolation` | boolean | **false** | Use fresh Playwright context per business (slower, stealthier). |
 | `entryFlowRatios` | string | `"google:0.6,direct:0.3,bing:0.1"` | Weights for entry modes, normalized automatically. |
@@ -36,6 +36,8 @@ Each dataset item contains exactly eight keys:
 
 ### Derived defaults
 If `GROK_API_KEY` is **not** set the actor disables Crawl4AI & LLM fallbacks and still works with JSON-LD + DOM only (email may stay `null`).
+
+Note: Regardless of the input, the actor enforces concurrency within 3 – 5 to balance stealth, memory usage and proxy bandwidth.
 
 ---
 
@@ -108,7 +110,7 @@ During the run you’ll see structured logs: navigation URLs, block rerolls, ext
 
 ## Limitations & tips
 
-• High concurrency may exhaust proxy bandwidth—start with 10–15 and adjust.  
+• Very high concurrency may exhaust proxy bandwidth or trigger blocks—keep it in the 3–5 range.  
 • CAPTCHA pages cause immediate fail unless a solver is plugged in.  
 • Email discovery depends on public availability; corporate sites that hide emails behind forms will return `null`.  
 • Respect **robots.txt** – the actor fetches it first and will terminate if access is disallowed.

@@ -41,7 +41,10 @@ async def main():
         
         # Extract other inputs with defaults
         num_businesses = min(actor_input.get('numBusinesses', 50), 500)
-        concurrency = actor_input.get('concurrency', 12)
+        # Clamp concurrency between 3 and 5 (default 5)
+        requested_concurrency = int(actor_input.get('concurrency', 5) or 5)
+        concurrency = max(3, min(5, requested_concurrency))
+        await Actor.log.info(f"Concurrency set to {concurrency} (requested {requested_concurrency})")
         natural_navigation = actor_input.get('naturalNavigation', False)
         per_business_isolation = actor_input.get('perBusinessIsolation', False)
         entry_flow_ratios_str = actor_input.get('entryFlowRatios', 'google:0.6,direct:0.3,bing:0.1')

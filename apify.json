@@ -19,7 +19,7 @@
         "location": { "type": "string" },
         "searchUrl": { "type": "string" },
         "numBusinesses": { "type": "integer", "default": 50, "maximum": 500 },
-        "concurrency": { "type": "integer", "default": 12, "minimum": 1, "maximum": 30 },
+        "concurrency": { "type": "integer", "default": 5, "minimum": 3, "maximum": 5 },
         "naturalNavigation": { "type": "boolean", "default": false },
         "perBusinessIsolation": { "type": "boolean", "default": false },
         "entryFlowRatios": { "type": "string", "default": "google:0.6,direct:0.3,bing:0.1" },
