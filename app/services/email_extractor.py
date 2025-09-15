@@ -4,6 +4,7 @@ Provides functions to extract emails from text and to discover emails from websi
 """
 
 import asyncio
+import json
 import logging
 import random
 import re
@@ -21,6 +22,17 @@ logger = logging.getLogger(__name__)
 EMAIL_REGEX = r'[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}'
 EMAIL_REGEX_QUOTED = r'"[^"]+?"@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}'
 
+# Regex for obfuscated emails
+OBFUSCATED_EMAIL_PATTERNS = [
+    r'[a-zA-Z0-9._%+\-]+\s*[\[\(]at[\]\)]\s*[a-zA-Z0-9.\-]+\s*[\[\(]dot[\]\)]\s*[a-zA-Z]{2,}',  # name [at] domain [dot] com
+    r'[a-zA-Z0-9._%+\-]+\s*@\s*[a-zA-Z0-9.\-]+\s*\.\s*[a-zA-Z]{2,}',  # name @ domain . com (with spaces)
+    r'[a-zA-Z0-9._%+\-]+\s+at\s+[a-zA-Z0-9.\-]+\s+dot\s+[a-zA-Z]{2,}',  # name at domain dot com
+    r'[a-zA-Z0-9._%+\-]+\s*\(at\)\s*[a-zA-Z0-9.\-]+\s*\(dot\)\s*[a-zA-Z]{2,}',  # name(at)domain(dot)com
+]
+
+# Regex for mailto links
+MAILTO_REGEX = r'mailto:([^"\'\s\?]+)'
+
 # Common non-contact emails to filter out
 NON_CONTACT_EMAILS = {
     'noreply', 'no-reply', 'donotreply', 'do-not-reply', 'no_reply',
@@ -29,6 +41,13 @@ NON_CONTACT_EMAILS = {
     'marketing', 'privacy', 'legal', 'billing', 'accounts',
     'example', 'test', 'user', 'username', 'email', 'mail'
 }
+
+# Contact page patterns for following
+CONTACT_PAGE_PATTERNS = [
+    'contact', 'about', 'team', 'support', 'impressum', 'imprint', 
+    'kontakt', 'about-us', 'our-team', 'get-in-touch', 'reach-us',
+    'connect', 'talk-to-us', 'feedback', 'help', 'customer-service'
+]
 
 # User agent strings for randomization
 USER_AGENTS = [
@@ -39,6 +58,33 @@ USER_AGENTS = [
     'Mozilla/5.0 (iPhone; CPU iPhone OS 14_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/14.0 Mobile/15E148 Safari/604.1',
     'Mozilla/5.0 (iPad; CPU OS 14_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/14.0 Mobile/15E148 Safari/604.1',
 ]
+
+
+def deobfuscate_email(text: str) -> str:
+    """
+    Deobfuscate common email obfuscation patterns.
+    
+    Args:
+        text: Text containing obfuscated email
+        
+    Returns:
+        Deobfuscated email address
+    """
+    # Replace [at] or (at) with @
+    text = re.sub(r'[\[\(]\s*at\s*[\]\)]', '@', text)
+    text = re.sub(r'\s+at\s+', '@', text)
+    text = re.sub(r'\(at\)', '@', text)
+    
+    # Replace [dot] or (dot) with .
+    text = re.sub(r'[\[\(]\s*dot\s*[\]\)]', '.', text)
+    text = re.sub(r'\s+dot\s+', '.', text)
+    text = re.sub(r'\(dot\)', '.', text)
+    
+    # Remove spaces around @ and .
+    text = re.sub(r'\s*@\s*', '@', text)
+    text = re.sub(r'\s*\.\s*', '.', text)
+    
+    return text
 
 
 def extract_emails_from_text(text: str) -> List[str]:
@@ -60,13 +106,79 @@ def extract_emails_from_text(text: str) -> List[str]:
     # Also find quoted emails
     quoted_emails = re.findall(EMAIL_REGEX_QUOTED, text, re.IGNORECASE)
     
+    # Find obfuscated emails and deobfuscate them
+    obfuscated_emails = []
+    for pattern in OBFUSCATED_EMAIL_PATTERNS:
+        matches = re.findall(pattern, text, re.IGNORECASE)
+        for match in matches:
+            deobfuscated = deobfuscate_email(match)
+            # Verify it's now a valid email
+            if re.match(EMAIL_REGEX, deobfuscated, re.IGNORECASE):
+                obfuscated_emails.append(deobfuscated)
+    
+    # Find mailto links
+    mailto_emails = re.findall(MAILTO_REGEX, text, re.IGNORECASE)
+    
     # Combine and deduplicate
-    all_emails = list(set(emails + quoted_emails))
+    all_emails = list(set(emails + quoted_emails + obfuscated_emails + mailto_emails))
     
     # Clean up emails (lowercase, strip whitespace)
     cleaned_emails = [email.lower().strip() for email in all_emails]
     
     return cleaned_emails
+
+
+def extract_email_from_jsonld(html: str) -> Optional[str]:
+    """
+    Extract email from JSON-LD structured data in HTML.
+    
+    Args:
+        html: HTML content
+        
+    Returns:
+        Email address if found, None otherwise
+    """
+    if not html:
+        return None
+    
+    # Find all JSON-LD scripts
+    jsonld_scripts = re.findall(r'<script[^>]*type=["\']application/ld\+json["\'][^>]*>(.*?)</script>', html, re.DOTALL)
+    
+    for script in jsonld_scripts:
+        try:
+            # Parse JSON
+            data = json.loads(script)
+            
+            # Handle both single objects and arrays
+            if isinstance(data, list):
+                items = data
+            else:
+                items = [data]
+            
+            # Look for email in each item
+            for item in items:
+                # Direct email property
+                if isinstance(item, dict):
+                    email = item.get('email')
+                    if email and isinstance(email, str) and '@' in email:
+                        return email
+                    
+                    # Check in nested Organization, Person, LocalBusiness, etc.
+                    for prop in ['author', 'creator', 'publisher', 'provider', 'employee', 'founder']:
+                        entity = item.get(prop)
+                        if isinstance(entity, dict) and entity.get('email'):
+                            return entity.get('email')
+                    
+                    # Check in contactPoint
+                    contact_point = item.get('contactPoint')
+                    if isinstance(contact_point, dict) and contact_point.get('email'):
+                        return contact_point.get('email')
+                    
+        except Exception as e:
+            logger.debug(f"Error parsing JSON-LD: {e}")
+            continue
+    
+    return None
 
 
 def is_likely_contact_email(email: str) -> bool:
@@ -209,6 +321,7 @@ async def extract_email_from_website(
         }
     
     emails_found = []
+    visited_urls = set([url])  # Track visited URLs to avoid loops
     
     try:
         async with httpx.AsyncClient(**client_kwargs) as client:
@@ -221,34 +334,95 @@ async def extract_email_from_website(
                 logger.info(f"Skipping non-HTML content: {content_type} for {url}")
                 return None
             
-            # Extract emails from HTML
+            # Get HTML content
             html_content = response.text
+            
+            # Extract emails from HTML
             emails_found = extract_emails_from_text(html_content)
             
-            # If no emails found, check for contact page links
-            if not emails_found:
+            # Extract email from JSON-LD
+            jsonld_email = extract_email_from_jsonld(html_content)
+            if jsonld_email:
+                logger.info(f"Found email in JSON-LD: {jsonld_email}")
+                emails_found.append(jsonld_email)
+            
+            # Extract emails from script tags
+            script_tags = re.findall(r'<script[^>]*>(.*?)</script>', html_content, re.DOTALL)
+            for script in script_tags:
+                script_emails = extract_emails_from_text(script)
+                if script_emails:
+                    logger.info(f"Found {len(script_emails)} emails in script tags")
+                    emails_found.extend(script_emails)
+            
+            # Extract mailto links explicitly
+            mailto_links = re.findall(MAILTO_REGEX, html_content)
+            if mailto_links:
+                logger.info(f"Found {len(mailto_links)} mailto links")
+                emails_found.extend(mailto_links)
+            
+            # If no emails found or we want more, check for contact page links
+            if len(emails_found) < 2:  # Continue looking if we found fewer than 2 emails
                 # Look for contact page links
-                contact_links = re.findall(r'href=[\'"]?([^\'" >]+)[\'"]?[^>]*>.*?contact', html_content, re.IGNORECASE)
+                contact_links = []
                 
-                # Try up to 2 contact pages
-                for i, link in enumerate(contact_links[:2]):
+                # Generate regex for contact page patterns
+                pattern_str = '|'.join(CONTACT_PAGE_PATTERNS)
+                contact_regex = rf'href=[\'"]?([^\'" >]+)[\'"]?[^>]*>.*?({pattern_str})'
+                
+                # Find all contact-like links
+                matches = re.findall(contact_regex, html_content, re.IGNORECASE)
+                contact_links = [match[0] for match in matches]
+                
+                # Also look for links containing contact patterns in the URL
+                for pattern in CONTACT_PAGE_PATTERNS:
+                    url_pattern_links = re.findall(rf'href=[\'"]?([^\'" >]+{pattern}[^\'" >]*)[\'"]?', html_content, re.IGNORECASE)
+                    contact_links.extend(url_pattern_links)
+                
+                # Deduplicate links
+                contact_links = list(set(contact_links))
+                
+                # Try up to 4 contact pages
+                for i, link in enumerate(contact_links[:4]):
                     try:
                         # Resolve relative URLs
                         contact_url = urljoin(url, link)
                         
-                        # Skip if same as original URL
-                        if contact_url == url:
+                        # Skip if already visited or same as original URL
+                        if contact_url in visited_urls:
                             continue
-                            
+                        
+                        visited_urls.add(contact_url)
                         logger.info(f"Checking contact page: {contact_url}")
                         
                         # Fetch the contact page
                         contact_response = await client.get(contact_url, timeout=timeout)
-                        contact_emails = extract_emails_from_text(contact_response.text)
+                        contact_html = contact_response.text
+                        
+                        # Extract emails from contact page
+                        contact_emails = extract_emails_from_text(contact_html)
+                        
+                        # Extract email from JSON-LD on contact page
+                        contact_jsonld_email = extract_email_from_jsonld(contact_html)
+                        if contact_jsonld_email:
+                            contact_emails.append(contact_jsonld_email)
+                        
+                        # Extract emails from script tags on contact page
+                        contact_script_tags = re.findall(r'<script[^>]*>(.*?)</script>', contact_html, re.DOTALL)
+                        for script in contact_script_tags:
+                            script_emails = extract_emails_from_text(script)
+                            if script_emails:
+                                contact_emails.extend(script_emails)
+                        
+                        # Extract mailto links from contact page
+                        contact_mailto_links = re.findall(MAILTO_REGEX, contact_html)
+                        if contact_mailto_links:
+                            contact_emails.extend(contact_mailto_links)
                         
                         if contact_emails:
                             emails_found.extend(contact_emails)
-                            break
+                            # If we found good emails, we can stop looking
+                            if any(is_likely_contact_email(email) for email in contact_emails):
+                                break
                     except Exception as e:
                         logger.warning(f"Error fetching contact page {link}: {e}")
             

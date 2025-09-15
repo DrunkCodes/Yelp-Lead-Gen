@@ -18,6 +18,7 @@ import aiolimiter
 from apify import Actor
 from playwright.async_api import Browser, BrowserContext, Page, Response
 
+from app.services.captcha_solver import solve_captcha
 from app.utils.retry import retry_async, with_retry
 
 logger = logging.getLogger(__name__)
@@ -93,7 +94,8 @@ class BaseScraper:
         concurrency: int = 10,
         per_business_isolation: bool = False,
         llm_enabled: bool = False,
-        metrics: Optional[Dict[str, Any]] = None
+        metrics: Optional[Dict[str, Any]] = None,
+        solver_api_key: Optional[str] = None
     ):
         """
         Initialize the base scraper.
@@ -107,6 +109,7 @@ class BaseScraper:
             per_business_isolation: Whether to use isolated contexts per business
             llm_enabled: Whether LLM features are enabled
             metrics: Dictionary for tracking metrics
+            solver_api_key: 2Captcha API key for solving CAPTCHAs
         """
         self.browser = browser
         self.proxy_configuration = proxy_configuration
@@ -116,6 +119,11 @@ class BaseScraper:
         self.per_business_isolation = per_business_isolation
         self.llm_enabled = llm_enabled
         self.metrics = metrics or {}
+        self.solver_api_key = solver_api_key
+        
+        # Log if CAPTCHA solver is enabled
+        if self.solver_api_key:
+            logger.info("CAPTCHA solver enabled with 2Captcha")
         
         # Set up navigation rate limiter (1 request per second)
         self.limiter = aiolimiter.AsyncLimiter(1, 1)
@@ -422,10 +430,35 @@ class BaseScraper:
             is_blocked = await self.soft_blocked(page)
             has_captcha = await self.has_captcha(page)
             
+            # Try to solve CAPTCHA if detected and solver is available
             if has_captcha:
                 if self.metrics:
                     self.metrics["captcha_hits"] = self.metrics.get("captcha_hits", 0) + 1
-                raise Exception(f"CAPTCHA detected at {url}")
+                
+                if self.solver_api_key:
+                    logger.info("CAPTCHA detected, attempting to solve with 2Captcha")
+                    solved = await solve_captcha(page, self.solver_api_key)
+                    
+                    if solved:
+                        logger.info("CAPTCHA solved successfully")
+                        if self.metrics:
+                            self.metrics["captcha_solved"] = self.metrics.get("captcha_solved", 0) + 1
+                        
+                        # Recheck page state after solving
+                        is_blocked = await self.soft_blocked(page)
+                        has_captcha = await self.has_captcha(page)
+                        
+                        # If still blocked or has CAPTCHA, raise exception
+                        if is_blocked or has_captcha:
+                            raise Exception(f"Still blocked after solving CAPTCHA at {url}")
+                    else:
+                        logger.warning("Failed to solve CAPTCHA")
+                        if self.metrics:
+                            self.metrics["captcha_failed"] = self.metrics.get("captcha_failed", 0) + 1
+                        raise Exception(f"Failed to solve CAPTCHA at {url}")
+                else:
+                    # No solver available
+                    raise Exception(f"CAPTCHA detected at {url} but no solver configured")
             
             if is_blocked:
                 if self.metrics:

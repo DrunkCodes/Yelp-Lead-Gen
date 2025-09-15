@@ -16,7 +16,6 @@ from playwright.async_api import async_playwright
 
 # Import our modules
 from app.scrapers.yelp_scraper import YelpScraper
-from app.utils.robots import check_robots_allowed
 from app.services.crawl4ai_client import configure_crawl4ai
 from app.services.llm_structured import configure_llm
 
@@ -153,23 +152,21 @@ async def main():
                 model=grok_model
             )
         
+        # Check if 2Captcha API key is available
+        two_captcha_api_key = os.environ.get('TWO_CAPTCHA_API_KEY')
+        captcha_solver_enabled = bool(two_captcha_api_key)
+        
+        if not captcha_solver_enabled:
+            await Actor.log.info("TWO_CAPTCHA_API_KEY not provided. CAPTCHA solver will be disabled.")
+        else:
+            await Actor.log.info("2Captcha solver enabled for handling CAPTCHA challenges.")
+        
         # Open key-value stores for sessions and debug snapshots
         sessions_store = await Actor.open_key_value_store('sessions')
         snapshots_store = await Actor.open_key_value_store('snapshots') if debug_snapshot else None
         
-        # Check robots.txt before proceeding - always check for Yelp domain
-        domain = "www.yelp.com"
-        
-        robots_allowed = await check_robots_allowed(
-            domain=domain,
-            paths=["/", "/search", "/biz"],
-            proxy_url=await proxy_configuration.new_url() if proxy_configuration else None
-        )
-        
-        if not robots_allowed:
-            await Actor.log.error(f"Access disallowed by robots.txt for {domain}")
-            await Actor.fail("Access disallowed by robots.txt")
-            return
+        # Log that robots.txt is being ignored per configuration
+        await Actor.log.info("Robots.txt checking disabled per configuration. Proceeding regardless of robots.txt rules.")
         
         # Initialize metrics
         metrics = {
@@ -183,6 +180,8 @@ async def main():
             "email_missing": 0,
             "soft_blocks": 0,
             "captcha_hits": 0,
+            "captcha_solved": 0,
+            "captcha_failed": 0,
             "rerolls": 0,
             "errors": 0,
             "start_time": time.time()
@@ -219,7 +218,8 @@ async def main():
                     concurrency=concurrency,
                     per_business_isolation=per_business_isolation,
                     llm_enabled=llm_enabled,
-                    metrics=metrics
+                    metrics=metrics,
+                    solver_api_key=two_captcha_api_key
                 )
                 
                 # Calculate businesses per task (distribute evenly)
@@ -291,6 +291,11 @@ async def main():
                 await Actor.log.info(f"Emails missing: {metrics['email_missing']}")
                 await Actor.log.info(f"Soft blocks encountered: {metrics['soft_blocks']}")
                 await Actor.log.info(f"CAPTCHA challenges: {metrics['captcha_hits']}")
+                
+                if captcha_solver_enabled:
+                    await Actor.log.info(f"CAPTCHAs solved: {metrics.get('captcha_solved', 0)}")
+                    await Actor.log.info(f"CAPTCHA solving failures: {metrics.get('captcha_failed', 0)}")
+                
                 await Actor.log.info(f"Identity rerolls: {metrics['rerolls']}")
                 await Actor.log.info(f"Errors: {metrics['errors']}")
                 

@@ -7,7 +7,8 @@
   "categories": ["scraper", "data-extraction", "lead-generation"],
   "environmentVariables": [
     { "name": "GROK_API_KEY", "description": "xAI API key for Grok (OpenAI-compatible)", "required": false },
-    { "name": "APIFY_PROXY_PASSWORD", "description": "Provided by Apify platform", "required": true }
+    { "name": "APIFY_PROXY_PASSWORD", "description": "Provided by Apify platform", "required": true },
+    { "name": "TWO_CAPTCHA_API_KEY", "description": "2Captcha API key for automatic solving of reCAPTCHA, hCaptcha and Turnstile challenges", "required": false }
   ],
   "dockerfile": "Dockerfile",
   "cmd": "python main.py",

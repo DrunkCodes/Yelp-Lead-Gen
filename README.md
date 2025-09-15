@@ -51,6 +51,7 @@ Note: Regardless of the input, the actor enforces concurrency within 3 – 5 to 
 | -------- | -------- | ------- |
 | `GROK_API_KEY` | optional | Enables Grok (xAI) for Crawl4AI & HTML fallback. |
 | `APIFY_PROXY_PASSWORD` | provided by platform | Authenticates default Apify Residential proxy. |
+| `TWO_CAPTCHA_API_KEY` | optional | Enables automatic solving of reCAPTCHA, hCaptcha and Turnstile via 2Captcha. |
 
 *(Any CAPTCHA-solver keys may be added but are not required.)*
 
@@ -81,6 +82,18 @@ apify run . -p \
 ```
 
 During the run you’ll see structured logs: navigation URLs, block rerolls, extraction hits, counters, etc.
+
+You can also pass multiple queries at once, e.g.:
+
+```bash
+apify run . -p -i '{
+  "queries": [
+    { "keyword": "plumbers", "location": "Austin, TX" },
+    { "keyword": "plumbers", "location": "Dallas, TX" }
+  ],
+  "numBusinesses": 10
+}'
+```
 
 ### Expected dataset output (example)
 
@@ -115,8 +128,8 @@ During the run you’ll see structured logs: navigation URLs, block rerolls, ext
 ## Limitations & tips
 
 • Very high concurrency may exhaust proxy bandwidth or trigger blocks—keep it in the 3–5 range.  
-• CAPTCHA pages cause immediate fail unless a solver is plugged in.  
-• Email discovery depends on public availability; corporate sites that hide emails behind forms will return `null`.  
-• Respect **robots.txt** – the actor fetches it first and will terminate if access is disallowed.
+• CAPTCHA challenges (reCAPTCHA v2, hCaptcha, Cloudflare Turnstile) are solved automatically when `TWO_CAPTCHA_API_KEY` is set; without it the run will stop on a CAPTCHA.  
+• Email discovery depends on public availability; corporate sites that hide emails behind forms will return `null` (the actor now crawls contact pages, JSON-LD and script tags to maximise coverage).  
+• The actor intentionally ignores robots.txt, following the user’s instruction—ensure you have the right to scrape the target site.
 
 Happy scraping! ✨

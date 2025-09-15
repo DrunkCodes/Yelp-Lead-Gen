@@ -4,7 +4,7 @@
 # Core dependencies
 apify>=2.1.0,<3
 playwright>=1.43.0,<2
-httpx>=0.27.0,<1
+httpx>=0.27.0,<1  # Used for both HTTP requests and 2captcha API calls when TWO_CAPTCHA_API_KEY is set
 aiolimiter>=1.1.0,<2
 
 # Extraction and parsing
@@ -14,3 +14,6 @@ pydantic>=2.6.0,<3
 # Utilities
 typing-extensions>=4.10.0,<5
 anyio>=4.3.0,<5
+
+# Note: 2captcha integration uses httpx for API calls, no additional packages required
+# Set TWO_CAPTCHA_API_KEY env variable to enable automatic CAPTCHA solving
