@@ -25,6 +25,10 @@ Each dataset item contains exactly eight keys:
 | `keyword` | string | – | Search keyword (e.g. “cafes”). Required if `searchUrl` omitted. |
 | `location` | string | – | Location (e.g. “Seattle, WA”). Required if `searchUrl` omitted. |
 | `searchUrl` | string | – | Direct Yelp search URL. Overrides `keyword`+`location`. |
+| `queries` | array\<object\> | – | List of objects `{ "keyword": "...", "location": "..." }`. Each entry is scraped as an independent task. |
+| `keywords` | array\<string\> | – | List of keywords to combine with every value in `locations` (cross-product mode). |
+| `locations` | array\<string\> | – | List of locations to combine with every value in `keywords` (cross-product mode). |
+| `searchUrls` | array\<string\> | – | Direct Yelp search URLs processed as-is (skips keyword/location building). |
 | `numBusinesses` | integer | **50** | Max 500. Stops when reached or pages exhausted. |
 | `concurrency` | integer | **5** | Actor clamps the value between **3 – 5**; governs parallel detail fetches (HTTP & LLM guarded internally). |
 | `naturalNavigation` | boolean | **false** | Start from Google/Bing instead of hitting Yelp directly. |

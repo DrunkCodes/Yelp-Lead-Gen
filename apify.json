@@ -18,6 +18,33 @@
         "keyword": { "type": "string" },
         "location": { "type": "string" },
         "searchUrl": { "type": "string" },
+        "queries": {
+          "type": "array",
+          "description": "Array of query objects, each with 'keyword' and 'location'.",
+          "items": {
+            "type": "object",
+            "properties": {
+              "keyword": { "type": "string" },
+              "location": { "type": "string" }
+            },
+            "required": ["keyword", "location"]
+          }
+        },
+        "keywords": {
+          "type": "array",
+          "description": "List of keywords to combine with locations (cross-product if multiple).",
+          "items": { "type": "string" }
+        },
+        "locations": {
+          "type": "array",
+          "description": "List of locations to combine with keywords (cross-product if multiple).",
+          "items": { "type": "string" }
+        },
+        "searchUrls": {
+          "type": "array",
+          "description": "Direct Yelp search URLs to process.",
+          "items": { "type": "string", "format": "uri" }
+        },
         "numBusinesses": { "type": "integer", "default": 50, "maximum": 500 },
         "concurrency": { "type": "integer", "default": 5, "minimum": 3, "maximum": 5 },
         "naturalNavigation": { "type": "boolean", "default": false },

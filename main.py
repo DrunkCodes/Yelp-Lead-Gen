@@ -29,15 +29,64 @@ async def main():
         # Get input and set defaults
         actor_input = await Actor.get_input() or {}
         
-        # Extract and validate required inputs
+        # ------------------------------------------------------------------
+        # 1) Build unified list of search tasks from multiple input flavours
+        # ------------------------------------------------------------------
+
         keyword = actor_input.get('keyword')
         location = actor_input.get('location')
-        search_url = actor_input.get('searchUrl')
-        
-        # Validate inputs
-        if not search_url and not (keyword and location):
-            await Actor.fail("Either 'searchUrl' or both 'keyword' and 'location' must be provided")
+        single_search_url = actor_input.get('searchUrl')
+
+        # Arrays
+        queries_array = actor_input.get('queries') or []
+        keywords_array = actor_input.get('keywords') or []
+        locations_array = actor_input.get('locations') or []
+        search_urls_array = actor_input.get('searchUrls') or []
+
+        # Normalise to lists
+        if isinstance(queries_array, dict):
+            queries_array = [queries_array]
+
+        search_tasks: List[Dict[str, Any]] = []
+
+        # a) explicit query objects
+        for q in queries_array:
+            kw = q.get('keyword')
+            loc = q.get('location')
+            if kw and loc:
+                search_tasks.append({'type': 'query', 'keyword': kw, 'location': loc})
+
+        # b) cross-product keywords × locations arrays
+        if keywords_array and locations_array:
+            for kw in keywords_array:
+                for loc in locations_array:
+                    search_tasks.append({'type': 'query', 'keyword': kw, 'location': loc})
+
+        # c) direct search URLs array
+        for url in search_urls_array:
+            if isinstance(url, str) and url.startswith('http'):
+                search_tasks.append({'type': 'url', 'url': url})
+
+        # d) legacy single fields (added last to preserve previous behaviour)
+        if single_search_url:
+            search_tasks.append({'type': 'url', 'url': single_search_url})
+        elif keyword and location:
+            search_tasks.append({'type': 'query', 'keyword': keyword, 'location': location})
+
+        # Validate we have at least one task
+        if not search_tasks:
+            await Actor.fail(
+                "No valid search task supplied. Provide 'queries', "
+                "'keywords' + 'locations', 'searchUrls', or legacy fields."
+            )
             return
+
+        await Actor.log.info(f"Prepared {len(search_tasks)} search task(s)")
+        for idx, t in enumerate(search_tasks, 1):
+            if t['type'] == 'url':
+                await Actor.log.info(f"  Task {idx}: URL -> {t['url']}")
+            else:
+                await Actor.log.info(f"  Task {idx}: Query -> '{t['keyword']}' in '{t['location']}'")
         
         # Extract other inputs with defaults
         num_businesses = min(actor_input.get('numBusinesses', 50), 500)
@@ -79,6 +128,11 @@ async def main():
         proxy_configuration = await Actor.create_proxy_configuration(proxy_config_options)
         if not proxy_configuration:
             await Actor.log.warning("No proxy configuration available. Proceeding without proxy.")
+        else:
+            proxy_info = "RESIDENTIAL"
+            if country:
+                proxy_info += f" ({country})"
+            await Actor.log.info(f"Using Apify {proxy_info} proxy")
         
         # Check if Grok API key is available
         grok_api_key = os.environ.get('GROK_API_KEY')
@@ -103,11 +157,8 @@ async def main():
         sessions_store = await Actor.open_key_value_store('sessions')
         snapshots_store = await Actor.open_key_value_store('snapshots') if debug_snapshot else None
         
-        # Check robots.txt before proceeding
-        if search_url:
-            domain = urlparse(search_url).netloc
-        else:
-            domain = "www.yelp.com"
+        # Check robots.txt before proceeding - always check for Yelp domain
+        domain = "www.yelp.com"
         
         robots_allowed = await check_robots_allowed(
             domain=domain,
@@ -150,6 +201,8 @@ async def main():
                 if parsed.username and parsed.password:
                     browser_proxy["username"] = parsed.username
                     browser_proxy["password"] = parsed.password
+                
+                await Actor.log.info(f"Configured Playwright with Residential proxy: {parsed.netloc}")
             
             browser = await playwright.chromium.launch(
                 headless=True,
@@ -169,15 +222,50 @@ async def main():
                     metrics=metrics
                 )
                 
-                # Run the scraper
-                await scraper.scrape(
-                    keyword=keyword,
-                    location=location,
-                    search_url=search_url,
-                    num_businesses=num_businesses,
-                    natural_navigation=natural_navigation,
-                    entry_flow_ratios=entry_flow_ratios
-                )
+                # Calculate businesses per task (distribute evenly)
+                businesses_per_task = num_businesses // len(search_tasks)
+                # Add remainder to first task
+                remainder = num_businesses % len(search_tasks)
+                
+                # Process each search task
+                for task_idx, task in enumerate(search_tasks):
+                    # Skip if we've already reached the target
+                    if metrics["businesses_scraped"] >= num_businesses:
+                        await Actor.log.info(f"Reached target of {num_businesses} businesses, skipping remaining tasks")
+                        break
+                    
+                    # Calculate remaining budget
+                    remaining_budget = num_businesses - metrics["businesses_scraped"]
+                    # Calculate task budget (either the per-task allocation or what's left)
+                    task_budget = min(
+                        businesses_per_task + (remainder if task_idx == 0 else 0),
+                        remaining_budget
+                    )
+                    
+                    await Actor.log.info(f"Processing task {task_idx+1}/{len(search_tasks)}, budget: {task_budget} businesses")
+                    
+                    # Run the scraper based on task type
+                    if task["type"] == "url":
+                        await scraper.scrape(
+                            search_url=task["url"],
+                            num_businesses=task_budget,
+                            natural_navigation=natural_navigation,
+                            entry_flow_ratios=entry_flow_ratios
+                        )
+                    else:  # task["type"] == "query"
+                        await scraper.scrape(
+                            keyword=task["keyword"],
+                            location=task["location"],
+                            num_businesses=task_budget,
+                            natural_navigation=natural_navigation,
+                            entry_flow_ratios=entry_flow_ratios
+                        )
+                    
+                    # Log progress after each task
+                    await Actor.log.info(
+                        f"Task {task_idx+1} complete: {metrics['businesses_scraped']} "
+                        f"businesses scraped so far ({remaining_budget} remaining)"
+                    )
                 
             except Exception as e:
                 await Actor.log.error(f"Scraper failed: {e}")
