@@ -37,6 +37,8 @@ Each dataset item contains exactly eight keys:
 | `debugSnapshot` | boolean | **false** | Save HTML snapshots to KV store for troubleshooting. |
 | `grokModel` | string | `"grok-2"` | Model name passed to xAI endpoint. |
 | `country` | string | – | ISO2 code to pin Apify Residential proxy exit country. |
+| `captchaTimeoutSeconds` | integer | **300** | Max time (sec) to wait for 2Captcha solution before giving up. |
+| `emailMaxContactPages` | integer | **10** | How many internal “contact/about” pages to follow when hunting for emails. |
 
 ### Derived defaults
 If `GROK_API_KEY` is **not** set the actor disables Crawl4AI & LLM fallbacks and still works with JSON-LD + DOM only (email may stay `null`).
@@ -131,5 +133,6 @@ apify run . -p -i '{
 • CAPTCHA challenges (reCAPTCHA v2, hCaptcha, Cloudflare Turnstile) are solved automatically when `TWO_CAPTCHA_API_KEY` is set; without it the run will stop on a CAPTCHA.  
 • Email discovery depends on public availability; corporate sites that hide emails behind forms will return `null` (the actor now crawls contact pages, JSON-LD and script tags to maximise coverage).  
 • The actor intentionally ignores robots.txt, following the user’s instruction—ensure you have the right to scrape the target site.
+• Navigation now retries up to **5** times with exponential back-off to reduce transient failures.
 
 Happy scraping! ✨

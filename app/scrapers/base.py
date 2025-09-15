@@ -95,7 +95,9 @@ class BaseScraper:
         per_business_isolation: bool = False,
         llm_enabled: bool = False,
         metrics: Optional[Dict[str, Any]] = None,
-        solver_api_key: Optional[str] = None
+        solver_api_key: Optional[str] = None,
+        captcha_timeout: Optional[int] = None,
+        email_max_contact_pages: Optional[int] = None
     ):
         """
         Initialize the base scraper.
@@ -120,10 +122,15 @@ class BaseScraper:
         self.llm_enabled = llm_enabled
         self.metrics = metrics or {}
         self.solver_api_key = solver_api_key
+        # Timeouts / limits configurable via input
+        self.captcha_timeout = captcha_timeout or 240  # seconds
+        self.email_max_contact_pages = email_max_contact_pages or 8
         
         # Log if CAPTCHA solver is enabled
         if self.solver_api_key:
             logger.info("CAPTCHA solver enabled with 2Captcha")
+        logger.info(f"CAPTCHA max wait set to {self.captcha_timeout}s; "
+                    f"Email crawl page limit = {self.email_max_contact_pages}")
         
         # Set up navigation rate limiter (1 request per second)
         self.limiter = aiolimiter.AsyncLimiter(1, 1)
@@ -221,6 +228,7 @@ class BaseScraper:
             "Sec-Fetch-Site": "none",
             "Sec-Fetch-User": "?1",
             "Cache-Control": "max-age=0",
+            "Pragma": "no-cache",
         }
         
         # Add referer if provided
@@ -384,7 +392,7 @@ class BaseScraper:
         for context in list(self.contexts):
             await self.close_context(context)
     
-    @with_retry(max_tries=3, base_delay=2.0, jitter=True)
+    @with_retry(max_tries=5, base_delay=2.0, jitter=True)
     async def navigate(
         self,
         page: Page,
@@ -437,7 +445,11 @@ class BaseScraper:
                 
                 if self.solver_api_key:
                     logger.info("CAPTCHA detected, attempting to solve with 2Captcha")
-                    solved = await solve_captcha(page, self.solver_api_key)
+                    solved = await solve_captcha(
+                        page,
+                        self.solver_api_key,
+                        timeout=self.captcha_timeout
+                    )
                     
                     if solved:
                         logger.info("CAPTCHA solved successfully")

@@ -53,7 +53,19 @@
         "entryFlowRatios": { "type": "string", "default": "google:0.6,direct:0.3,bing:0.1" },
         "debugSnapshot": { "type": "boolean", "default": false },
         "grokModel": { "type": "string", "default": "grok-2" },
-        "country": { "type": "string" }
+        "country": { "type": "string" },
+        "captchaTimeoutSeconds": {
+          "type": "integer",
+          "default": 300,
+          "minimum": 60,
+          "maximum": 1200
+        },
+        "emailMaxContactPages": {
+          "type": "integer",
+          "default": 10,
+          "minimum": 1,
+          "maximum": 20
+        }
       }
     }
   }

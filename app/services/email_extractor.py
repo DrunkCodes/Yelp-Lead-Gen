@@ -258,7 +258,8 @@ async def extract_email_from_website(
     referer: Optional[str] = None,
     timeout: float = 20.0,
     max_size: int = 5 * 1024 * 1024,  # 5MB
-    llm_enabled: bool = False
+    llm_enabled: bool = False,
+    max_contact_pages: int = 8
 ) -> Optional[str]:
     """
     Extract email addresses from a website URL.
@@ -270,6 +271,7 @@ async def extract_email_from_website(
         timeout: Request timeout in seconds
         max_size: Maximum response size in bytes
         llm_enabled: Whether LLM fallback is enabled
+        max_contact_pages: How many internal “contact” pages to follow at most
         
     Returns:
         The most likely contact email, or None if no emails found
@@ -381,8 +383,8 @@ async def extract_email_from_website(
                 # Deduplicate links
                 contact_links = list(set(contact_links))
                 
-                # Try up to 4 contact pages
-                for i, link in enumerate(contact_links[:4]):
+                # Try up to `max_contact_pages` contact pages
+                for i, link in enumerate(contact_links[:max_contact_pages]):
                     try:
                         # Resolve relative URLs
                         contact_url = urljoin(url, link)

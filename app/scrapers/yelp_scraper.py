@@ -487,7 +487,8 @@ class YelpScraper(BaseScraper):
                             url=business_data['website'],
                             proxy_url=proxy_url,
                             referer=url,
-                            llm_enabled=self.llm_enabled
+                            llm_enabled=self.llm_enabled,
+                            max_contact_pages=self.email_max_contact_pages
                         )
                         
                         if email:

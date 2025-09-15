@@ -99,6 +99,14 @@ async def main():
         debug_snapshot = actor_input.get('debugSnapshot', False)
         grok_model = actor_input.get('grokModel', 'grok-2')
         country = actor_input.get('country')
+
+        # New configurable limits
+        captcha_timeout_sec = int(actor_input.get('captchaTimeoutSeconds', 300))
+        email_max_contact_pages = int(actor_input.get('emailMaxContactPages', 10))
+        await Actor.log.info(
+            f"CAPTCHA timeout seconds: {captcha_timeout_sec}; "
+            f"Email max contact pages: {email_max_contact_pages}"
+        )
         
         # Parse entry flow ratios
         entry_flow_ratios = {}
@@ -219,7 +227,9 @@ async def main():
                     per_business_isolation=per_business_isolation,
                     llm_enabled=llm_enabled,
                     metrics=metrics,
-                    solver_api_key=two_captcha_api_key
+                    solver_api_key=two_captcha_api_key,
+                    captcha_timeout=captcha_timeout_sec,
+                    email_max_contact_pages=email_max_contact_pages
                 )
                 
                 # Calculate businesses per task (distribute evenly)
