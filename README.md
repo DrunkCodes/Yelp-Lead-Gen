@@ -1,1 +1,116 @@
-# Yelp-Lead-Gen
+# Apify Actor – Yelp Scraper (Playwright + Crawl4AI + Grok)
+
+Production-grade Apify Python actor that collects enriched lead data from Yelp business pages.  
+The actor automates the full pipeline: search navigation → pagination → detail extraction → email discovery, combining multiple extraction layers (JSON-LD, DOM, Crawl4AI schema, Grok LLM fallback).
+
+Each dataset item contains exactly eight keys:
+
+| key | type | notes |
+| --- | --- | --- |
+| business_name | string | required |
+| years_in_business | int \| null | computed from founding date or text |
+| rating | float \| null | 0–5 |
+| review_count | int \| null | number of reviews |
+| industry | string \| null | first category list |
+| phone | string \| null | cleaned `tel:` |
+| website | string \| null | dereferenced from `/biz_redir?url=…` |
+| email | string \| null | scraped/LLM-derived from website |
+
+---
+
+## Actor input
+
+| field | type | default | description |
+| ----- | ---- | ------- | ----------- |
+| `keyword` | string | – | Search keyword (e.g. “cafes”). Required if `searchUrl` omitted. |
+| `location` | string | – | Location (e.g. “Seattle, WA”). Required if `searchUrl` omitted. |
+| `searchUrl` | string | – | Direct Yelp search URL. Overrides `keyword`+`location`. |
+| `numBusinesses` | integer | **50** | Max 500. Stops when reached or pages exhausted. |
+| `concurrency` | integer | **12** | Max parallel detail fetches (HTTP & LLM guarded internally). |
+| `naturalNavigation` | boolean | **false** | Start from Google/Bing instead of hitting Yelp directly. |
+| `perBusinessIsolation` | boolean | **false** | Use fresh Playwright context per business (slower, stealthier). |
+| `entryFlowRatios` | string | `"google:0.6,direct:0.3,bing:0.1"` | Weights for entry modes, normalized automatically. |
+| `debugSnapshot` | boolean | **false** | Save HTML snapshots to KV store for troubleshooting. |
+| `grokModel` | string | `"grok-2"` | Model name passed to xAI endpoint. |
+| `country` | string | – | ISO2 code to pin Apify Residential proxy exit country. |
+
+### Derived defaults
+If `GROK_API_KEY` is **not** set the actor disables Crawl4AI & LLM fallbacks and still works with JSON-LD + DOM only (email may stay `null`).
+
+---
+
+## Environment variables
+
+| variable | required | purpose |
+| -------- | -------- | ------- |
+| `GROK_API_KEY` | optional | Enables Grok (xAI) for Crawl4AI & HTML fallback. |
+| `APIFY_PROXY_PASSWORD` | provided by platform | Authenticates default Apify Residential proxy. |
+
+*(Any CAPTCHA-solver keys may be added but are not required.)*
+
+---
+
+## Running locally
+
+Prerequisites  
+```bash
+# one-time
+npm -g install apify-cli          # CLI
+python -m venv venv && source venv/bin/activate
+pip install -r requirements.txt
+python -m playwright install --with-deps chromium
+export GROK_API_KEY=sk-...        # optional for LLM
+```
+
+Run:
+
+```bash
+apify run . -p \
+  -i '{
+        "keyword": "cafes",
+        "location": "Seattle, WA",
+        "numBusinesses": 3,
+        "naturalNavigation": false
+      }'
+```
+
+During the run you’ll see structured logs: navigation URLs, block rerolls, extraction hits, counters, etc.
+
+### Expected dataset output (example)
+
+```json
+{
+  "business_name": "Moore Coffee Shop",
+  "years_in_business": 12,
+  "rating": 4.5,
+  "review_count": 1573,
+  "industry": "Coffee & Tea",
+  "phone": "(206) 555-1234",
+  "website": "https://www.moorecoffeeshop.com",
+  "email": "hello@moorecoffeeshop.com"
+}
+```
+
+---
+
+## Proxy, LLM and Crawl4AI notes
+
+* **Proxy** – Actor auto-creates an Apify Residential proxy (`groups:["RESIDENTIAL"]`).  
+  Pass `country` in input to lock exit IP region, or override globally in *Develop* tab.
+
+* **Crawl4AI** – Configured at runtime if `GROK_API_KEY` is present.  
+  Uses `LLMExtractionStrategy` with provider type **openai**  
+  (`base_url=https://api.x.ai/v1`, `model=input.grokModel`, `api_key=$GROK_API_KEY`).
+
+* **Grok fallback** – For pages where JSON-LD & Crawl4AI miss fields, raw HTML is sent to Grok with a strict “return only JSON” prompt and parsed defensively.
+
+---
+
+## Limitations & tips
+
+• High concurrency may exhaust proxy bandwidth—start with 10–15 and adjust.  
+• CAPTCHA pages cause immediate fail unless a solver is plugged in.  
+• Email discovery depends on public availability; corporate sites that hide emails behind forms will return `null`.  
+• Respect **robots.txt** – the actor fetches it first and will terminate if access is disallowed.
+
+Happy scraping! ✨

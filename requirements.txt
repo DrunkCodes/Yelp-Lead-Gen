@@ -1,0 +1,16 @@
+# Requirements for Yelp Scraper Apify Actor
+# Playwright browsers will be installed via Dockerfile, not pip
+
+# Core dependencies
+apify>=2.1.0,<3
+playwright>=1.43.0,<2
+httpx>=0.27.0,<1
+aiolimiter>=1.1.0,<2
+
+# Extraction and parsing
+crawl4ai>=0.7.0,<1
+pydantic>=2.6.0,<3
+
+# Utilities
+typing-extensions>=4.10.0,<5
+anyio>=4.3.0,<5

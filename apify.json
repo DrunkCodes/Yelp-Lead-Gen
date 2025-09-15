@@ -1,0 +1,32 @@
+{
+  "name": "yelp-scraper-grok-crawl4ai",
+  "version": "0.1.0",
+  "buildTag": "latest",
+  "title": "Yelp Scraper – Playwright + Crawl4AI + Grok",
+  "description": "Production-grade actor that extracts enriched business data (name, rating, reviews, phone, website, email, etc.) from Yelp using Playwright with Apify Residential proxy, Crawl4AI schema extraction and Grok LLM fallback.",
+  "categories": ["scraper", "data-extraction", "lead-generation"],
+  "environmentVariables": [
+    { "name": "GROK_API_KEY", "description": "xAI API key for Grok (OpenAI-compatible)", "required": false },
+    { "name": "APIFY_PROXY_PASSWORD", "description": "Provided by Apify platform", "required": true }
+  ],
+  "dockerfile": "Dockerfile",
+  "cmd": "python main.py",
+  "input": {
+    "schema": {
+      "type": "object",
+      "properties": {
+        "keyword": { "type": "string" },
+        "location": { "type": "string" },
+        "searchUrl": { "type": "string" },
+        "numBusinesses": { "type": "integer", "default": 50, "maximum": 500 },
+        "concurrency": { "type": "integer", "default": 12, "minimum": 1, "maximum": 30 },
+        "naturalNavigation": { "type": "boolean", "default": false },
+        "perBusinessIsolation": { "type": "boolean", "default": false },
+        "entryFlowRatios": { "type": "string", "default": "google:0.6,direct:0.3,bing:0.1" },
+        "debugSnapshot": { "type": "boolean", "default": false },
+        "grokModel": { "type": "string", "default": "grok-2" },
+        "country": { "type": "string" }
+      }
+    }
+  }
+}
