@@ -324,6 +324,5 @@ async def main():
 
 
 if __name__ == "__main__":
-    # Run the Actor
-    # SDK ≥ 2.0 uses `Actor.run` as the entrypoint helper
-    Actor.run(main)
+    # Run the Actor using the asyncio entry-point pattern (SDK v2+)
+    asyncio.run(main())
