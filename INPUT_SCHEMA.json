@@ -5,13 +5,6 @@
   "description": "Provide either keyword+location or a direct Yelp search URL. Advanced arrays are optional.",
   "type": "object",
   "required": [],
-  "oneOf": [
-    { "required": ["keyword", "location"] },
-    { "required": ["searchUrl"] },
-    { "required": ["queries"] },
-    { "required": ["searchUrls"] },
-    { "required": ["keywords", "locations"] }
-  ],
   "properties": {
     "keyword": {
       "type": "string",
