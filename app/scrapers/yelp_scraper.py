@@ -75,7 +75,7 @@ class YelpScraper(BaseScraper):
             search_url = self.build_search_url(keyword, location)
         
         if not search_url:
-            await Actor.log.error("No search URL provided or could not be built")
+            Actor.log.error("No search URL provided or could not be built")
             return
         
         # Create initial context
@@ -105,7 +105,7 @@ class YelpScraper(BaseScraper):
                 search_query = f"{keyword} {location}" if keyword and location else "yelp"
                 engine_url = self.search_engines[entry_flow].format(query=quote(search_query))
                 
-                await Actor.log.info(f"Using natural navigation via {entry_flow}")
+                Actor.log.info(f"Using natural navigation via {entry_flow}")
                 
                 # retry loop with reroll
                 max_rerolls = 3
@@ -131,28 +131,28 @@ class YelpScraper(BaseScraper):
                             yelp_url = page.url
                             referer = engine_url
 
-                            await Actor.log.info(
+                            Actor.log.info(
                                 f"Natural navigation successful, landed on: {yelp_url}"
                             )
 
                             # Success – exit reroll loop
                             break
                         else:
-                            await Actor.log.warning(
+                            Actor.log.warning(
                                 "No Yelp links found in search results, falling back to direct navigation"
                             )
                             break
                     except (SoftBlockError, CaptchaError) as e:
                         if reroll_idx < max_rerolls:
-                            await Actor.log.warning(
+                            Actor.log.warning(
                                 f"Soft block/ CAPTCHA ({e}) on engine entry, reroll {reroll_idx+1}/{max_rerolls}")
                             context = await self.reroll_identity(context, 'yelp', True)
                             page = await context.new_page()
                         else:
-                            await Actor.log.warning("Natural navigation failed after rerolls, falling back to direct navigation")
+                            Actor.log.warning("Natural navigation failed after rerolls, falling back to direct navigation")
                             break
                     except Exception as e:
-                        await Actor.log.warning(f"Natural navigation failed: {e}, falling back to direct navigation")
+                        Actor.log.warning(f"Natural navigation failed: {e}, falling back to direct navigation")
                         break
             
             # If we're not already on a search results page, navigate to the search URL
@@ -164,7 +164,7 @@ class YelpScraper(BaseScraper):
                         break
                     except (SoftBlockError, CaptchaError) as e:
                         if reroll_idx < max_rerolls:
-                            await Actor.log.warning(
+                            Actor.log.warning(
                                 f"Soft block/ CAPTCHA on Yelp search page ({e}), reroll {reroll_idx+1}/{max_rerolls}")
                             context = await self.reroll_identity(context, 'yelp', True)
                             page = await context.new_page()
@@ -176,7 +176,7 @@ class YelpScraper(BaseScraper):
                 page, num_businesses, search_url
             )
             
-            await Actor.log.info(f"Collected {len(business_links)} business links")
+            Actor.log.info(f"Collected {len(business_links)} business links")
             
             # Process business links
             tasks = []
@@ -203,7 +203,7 @@ class YelpScraper(BaseScraper):
                 await asyncio.gather(*tasks)
                 
         except Exception as e:
-            await Actor.log.error(f"Error during scraping: {e}")
+            Actor.log.error(f"Error during scraping: {e}")
             if self.metrics:
                 self.metrics["errors"] = self.metrics.get("errors", 0) + 1
         finally:
@@ -252,13 +252,13 @@ class YelpScraper(BaseScraper):
         max_pages = 25  # Limit to 25 pages to avoid excessive scraping
         
         while len(business_links) < num_links and page_num <= max_pages:
-            await Actor.log.info(f"Collecting links from page {page_num}")
+            Actor.log.info(f"Collecting links from page {page_num}")
             
             # Wait for business links to load
             try:
                 await page.wait_for_selector('a[href^="/biz/"]', timeout=10000)
             except Exception as e:
-                await Actor.log.warning(f"No business links found on page {page_num}: {e}")
+                Actor.log.warning(f"No business links found on page {page_num}: {e}")
                 break
             
             # Extract business links
@@ -295,7 +295,7 @@ class YelpScraper(BaseScraper):
                         break
                         
                 except Exception as e:
-                    await Actor.log.warning(f"Error processing link: {e}")
+                    Actor.log.warning(f"Error processing link: {e}")
             
             # Check if we have enough links
             if len(business_links) >= num_links:
@@ -307,7 +307,7 @@ class YelpScraper(BaseScraper):
                 # Try infinite scroll as a fallback
                 scrolled = await self._try_infinite_scroll(page)
                 if not scrolled:
-                    await Actor.log.info("No more pages available")
+                    Actor.log.info("No more pages available")
                     break
             
             page_num += 1
@@ -423,7 +423,7 @@ class YelpScraper(BaseScraper):
                         break
                     except (SoftBlockError, CaptchaError) as e:
                         if reroll_idx < max_rerolls:
-                            await Actor.log.warning(
+                            Actor.log.warning(
                                 f"Soft block/ CAPTCHA on business page ({e}), reroll {reroll_idx+1}/{max_rerolls}")
                             context = await self.reroll_identity(context, 'yelp', True)
                             page = await context.new_page()
@@ -435,7 +435,7 @@ class YelpScraper(BaseScraper):
                     await self.save_snapshot(page, f"business_{index}")
                 
                 # Extract business data using multiple methods
-                await Actor.log.info(f"Extracting data for business {index+1}/{total}: {url}")
+                Actor.log.info(f"Extracting data for business {index+1}/{total}: {url}")
                 
                 # Layer A: Extract data from JSON-LD
                 jsonld_data = await self._extract_jsonld(page)
@@ -464,7 +464,7 @@ class YelpScraper(BaseScraper):
                         if crawl4ai_data and self.metrics:
                             self.metrics["crawl4ai_hits"] = self.metrics.get("crawl4ai_hits", 0) + 1
                     except Exception as e:
-                        await Actor.log.warning(f"Crawl4AI extraction failed: {e}")
+                        Actor.log.warning(f"Crawl4AI extraction failed: {e}")
                 
                 # Layer C: Extract data using LLM fallback if LLM is enabled
                 llm_data = {}
@@ -479,7 +479,7 @@ class YelpScraper(BaseScraper):
                         if llm_data and self.metrics:
                             self.metrics["llm_fallbacks"] = self.metrics.get("llm_fallbacks", 0) + 1
                     except Exception as e:
-                        await Actor.log.warning(f"LLM extraction failed: {e}")
+                        Actor.log.warning(f"LLM extraction failed: {e}")
                 
                 # Layer D: Extract data using DOM selectors as fallback
                 dom_data = await self._extract_dom_data(page)
@@ -502,7 +502,7 @@ class YelpScraper(BaseScraper):
                 
                 # Skip if no business name
                 if not business_data.get('business_name'):
-                    await Actor.log.warning(f"No business name found for {url}, skipping")
+                    Actor.log.warning(f"No business name found for {url}, skipping")
                     return
                 
                 # Dereference website URL if it's a Yelp redirect
@@ -515,7 +515,7 @@ class YelpScraper(BaseScraper):
                             if real_url:
                                 business_data['website'] = real_url
                         except Exception as e:
-                            await Actor.log.warning(f"Failed to dereference website: {e}")
+                            Actor.log.warning(f"Failed to dereference website: {e}")
                 
                 # Extract email from website if available
                 email = None
@@ -542,7 +542,7 @@ class YelpScraper(BaseScraper):
                         elif self.metrics:
                             self.metrics["email_missing"] = self.metrics.get("email_missing", 0) + 1
                     except Exception as e:
-                        await Actor.log.warning(f"Email extraction failed: {e}")
+                        Actor.log.warning(f"Email extraction failed: {e}")
                         if self.metrics:
                             self.metrics["email_missing"] = self.metrics.get("email_missing", 0) + 1
                 
@@ -556,14 +556,14 @@ class YelpScraper(BaseScraper):
                     if self.metrics:
                         self.metrics["businesses_scraped"] = self.metrics.get("businesses_scraped", 0) + 1
                     
-                    await Actor.log.info(f"Successfully scraped business: {business.business_name}")
+                    Actor.log.info(f"Successfully scraped business: {business.business_name}")
                 except Exception as e:
-                    await Actor.log.error(f"Failed to create business object: {e}")
+                    Actor.log.error(f"Failed to create business object: {e}")
                     if self.metrics:
                         self.metrics["errors"] = self.metrics.get("errors", 0) + 1
                 
             except Exception as e:
-                await Actor.log.error(f"Error processing business {url}: {e}")
+                Actor.log.error(f"Error processing business {url}: {e}")
                 if self.metrics:
                     self.metrics["errors"] = self.metrics.get("errors", 0) + 1
                 raise
@@ -675,7 +675,7 @@ class YelpScraper(BaseScraper):
             return result
             
         except Exception as e:
-            await Actor.log.warning(f"Error extracting JSON-LD: {e}")
+            Actor.log.warning(f"Error extracting JSON-LD: {e}")
             return {}
     
     async def _extract_dom_data(self, page: Page) -> Dict[str, Any]:
@@ -859,7 +859,7 @@ class YelpScraper(BaseScraper):
             return result
             
         except Exception as e:
-            await Actor.log.warning(f"Error extracting DOM data: {e}")
+            Actor.log.warning(f"Error extracting DOM data: {e}")
             return {}
     
     async def _dereference_yelp_redirect(self, page: Page, redirect_url: str) -> Optional[str]:
@@ -896,5 +896,5 @@ class YelpScraper(BaseScraper):
                 await redirect_page.close()
                 
         except Exception as e:
-            await Actor.log.warning(f"Error dereferencing redirect: {e}")
+            Actor.log.warning(f"Error dereferencing redirect: {e}")
             return None

@@ -86,19 +86,19 @@ async def main():
             )
             return
 
-        await Actor.log.info(f"Prepared {len(search_tasks)} search task(s)")
+        Actor.log.info(f"Prepared {len(search_tasks)} search task(s)")
         for idx, t in enumerate(search_tasks, 1):
             if t['type'] == 'url':
-                await Actor.log.info(f"  Task {idx}: URL -> {t['url']}")
+                Actor.log.info(f"  Task {idx}: URL -> {t['url']}")
             else:
-                await Actor.log.info(f"  Task {idx}: Query -> '{t['keyword']}' in '{t['location']}'")
+                Actor.log.info(f"  Task {idx}: Query -> '{t['keyword']}' in '{t['location']}'")
         
         # Extract other inputs with defaults
         num_businesses = min(actor_input.get('numBusinesses', 50), 500)
         # Clamp concurrency between 3 and 5 (default 5)
         requested_concurrency = int(actor_input.get('concurrency', 5) or 5)
         concurrency = max(3, min(5, requested_concurrency))
-        await Actor.log.info(f"Concurrency set to {concurrency} (requested {requested_concurrency})")
+        Actor.log.info(f"Concurrency set to {concurrency} (requested {requested_concurrency})")
         natural_navigation = actor_input.get('naturalNavigation', False)
         per_business_isolation = actor_input.get('perBusinessIsolation', False)
         entry_flow_ratios_str = actor_input.get('entryFlowRatios', 'google:0.6,direct:0.3,bing:0.1')
@@ -109,7 +109,7 @@ async def main():
         # New configurable limits
         captcha_timeout_sec = int(actor_input.get('captchaTimeoutSeconds', 300))
         email_max_contact_pages = int(actor_input.get('emailMaxContactPages', 10))
-        await Actor.log.info(
+        Actor.log.info(
             f"CAPTCHA timeout seconds: {captcha_timeout_sec}; "
             f"Email max contact pages: {email_max_contact_pages}"
         )
@@ -128,7 +128,7 @@ async def main():
                 if total > 0:
                     entry_flow_ratios = {k: v/total for k, v in entry_flow_ratios.items()}
         except Exception as e:
-            await Actor.log.warning(f"Failed to parse entryFlowRatios: {e}. Using defaults.")
+            Actor.log.warning(f"Failed to parse entryFlowRatios: {e}. Using defaults.")
             entry_flow_ratios = {'google': 0.6, 'direct': 0.3, 'bing': 0.1}
         
         # Set up proxy configuration
@@ -140,19 +140,19 @@ async def main():
             
         proxy_configuration = await Actor.create_proxy_configuration(proxy_config_options)
         if not proxy_configuration:
-            await Actor.log.warning("No proxy configuration available. Proceeding without proxy.")
+            Actor.log.warning("No proxy configuration available. Proceeding without proxy.")
         else:
             proxy_info = "RESIDENTIAL"
             if country:
                 proxy_info += f" ({country})"
-            await Actor.log.info(f"Using Apify {proxy_info} proxy")
+            Actor.log.info(f"Using Apify {proxy_info} proxy")
         
         # Check if Grok API key is available
         grok_api_key = os.environ.get('GROK_API_KEY')
         llm_enabled = bool(grok_api_key)
         
         if not llm_enabled:
-            await Actor.log.info("GROK_API_KEY not provided. LLM features will be disabled.")
+            Actor.log.info("GROK_API_KEY not provided. LLM features will be disabled.")
         else:
             # Configure Crawl4AI and LLM services with Grok
             configure_crawl4ai(
@@ -171,16 +171,16 @@ async def main():
         captcha_solver_enabled = bool(two_captcha_api_key)
         
         if not captcha_solver_enabled:
-            await Actor.log.info("TWO_CAPTCHA_API_KEY not provided. CAPTCHA solver will be disabled.")
+            Actor.log.info("TWO_CAPTCHA_API_KEY not provided. CAPTCHA solver will be disabled.")
         else:
-            await Actor.log.info("2Captcha solver enabled for handling CAPTCHA challenges.")
+            Actor.log.info("2Captcha solver enabled for handling CAPTCHA challenges.")
         
         # Open key-value stores for sessions and debug snapshots
         sessions_store = await Actor.open_key_value_store('sessions')
         snapshots_store = await Actor.open_key_value_store('snapshots') if debug_snapshot else None
         
         # Log that robots.txt is being ignored per configuration
-        await Actor.log.info("Robots.txt checking disabled per configuration. Proceeding regardless of robots.txt rules.")
+        Actor.log.info("Robots.txt checking disabled per configuration. Proceeding regardless of robots.txt rules.")
         
         # Initialize metrics
         metrics = {
@@ -215,7 +215,7 @@ async def main():
                     browser_proxy["username"] = parsed.username
                     browser_proxy["password"] = parsed.password
                 
-                await Actor.log.info(f"Configured Playwright with Residential proxy: {parsed.netloc}")
+                Actor.log.info(f"Configured Playwright with Residential proxy: {parsed.netloc}")
             
             browser = await playwright.chromium.launch(
                 headless=True,
@@ -247,7 +247,9 @@ async def main():
                 for task_idx, task in enumerate(search_tasks):
                     # Skip if we've already reached the target
                     if metrics["businesses_scraped"] >= num_businesses:
-                        await Actor.log.info(f"Reached target of {num_businesses} businesses, skipping remaining tasks")
+                        Actor.log.info(
+                            f"Reached target of {num_businesses} businesses, skipping remaining tasks"
+                        )
                         break
                     
                     # Calculate remaining budget
@@ -258,7 +260,7 @@ async def main():
                         remaining_budget
                     )
                     
-                    await Actor.log.info(f"Processing task {task_idx+1}/{len(search_tasks)}, budget: {task_budget} businesses")
+                    Actor.log.info(f"Processing task {task_idx+1}/{len(search_tasks)}, budget: {task_budget} businesses")
                     
                     # Run the scraper based on task type
                     if task["type"] == "url":
@@ -278,13 +280,13 @@ async def main():
                         )
                     
                     # Log progress after each task
-                    await Actor.log.info(
+                    Actor.log.info(
                         f"Task {task_idx+1} complete: {metrics['businesses_scraped']} "
                         f"businesses scraped so far ({remaining_budget} remaining)"
                     )
                 
             except Exception as e:
-                await Actor.log.error(f"Scraper failed: {e}")
+                Actor.log.error(f"Scraper failed: {e}")
                 metrics["errors"] += 1
                 raise
             finally:
@@ -293,31 +295,31 @@ async def main():
                 
                 # Log final metrics
                 elapsed = time.time() - metrics["start_time"]
-                await Actor.log.info(f"Scraping completed in {elapsed:.2f} seconds")
-                await Actor.log.info(f"Businesses attempted: {metrics['businesses_attempted']}")
-                await Actor.log.info(f"Businesses successfully scraped: {metrics['businesses_scraped']}")
-                await Actor.log.info(f"JSON-LD extractions: {metrics['jsonld_hits']}")
+                Actor.log.info(f"Scraping completed in {elapsed:.2f} seconds")
+                Actor.log.info(f"Businesses attempted: {metrics['businesses_attempted']}")
+                Actor.log.info(f"Businesses successfully scraped: {metrics['businesses_scraped']}")
+                Actor.log.info(f"JSON-LD extractions: {metrics['jsonld_hits']}")
                 
                 if llm_enabled:
-                    await Actor.log.info(f"Crawl4AI extractions: {metrics['crawl4ai_hits']}")
-                    await Actor.log.info(f"LLM fallbacks: {metrics['llm_fallbacks']}")
+                    Actor.log.info(f"Crawl4AI extractions: {metrics['crawl4ai_hits']}")
+                    Actor.log.info(f"LLM fallbacks: {metrics['llm_fallbacks']}")
                 
-                await Actor.log.info(f"DOM fallbacks: {metrics['dom_fallbacks']}")
-                await Actor.log.info(f"Emails found: {metrics['email_found']}")
-                await Actor.log.info(f"Emails missing: {metrics['email_missing']}")
-                await Actor.log.info(f"Soft blocks encountered: {metrics['soft_blocks']}")
-                await Actor.log.info(f"CAPTCHA challenges: {metrics['captcha_hits']}")
+                Actor.log.info(f"DOM fallbacks: {metrics['dom_fallbacks']}")
+                Actor.log.info(f"Emails found: {metrics['email_found']}")
+                Actor.log.info(f"Emails missing: {metrics['email_missing']}")
+                Actor.log.info(f"Soft blocks encountered: {metrics['soft_blocks']}")
+                Actor.log.info(f"CAPTCHA challenges: {metrics['captcha_hits']}")
                 
                 if captcha_solver_enabled:
-                    await Actor.log.info(f"CAPTCHAs solved: {metrics.get('captcha_solved', 0)}")
-                    await Actor.log.info(f"CAPTCHA solving failures: {metrics.get('captcha_failed', 0)}")
+                    Actor.log.info(f"CAPTCHAs solved: {metrics.get('captcha_solved', 0)}")
+                    Actor.log.info(f"CAPTCHA solving failures: {metrics.get('captcha_failed', 0)}")
                 
-                await Actor.log.info(f"Identity rerolls: {metrics['rerolls']}")
-                await Actor.log.info(f"Errors: {metrics['errors']}")
+                Actor.log.info(f"Identity rerolls: {metrics['rerolls']}")
+                Actor.log.info(f"Errors: {metrics['errors']}")
                 
                 # Check if we met the target number of businesses
                 if metrics["businesses_scraped"] < num_businesses:
-                    await Actor.log.warning(
+                    Actor.log.warning(
                         f"Only scraped {metrics['businesses_scraped']} businesses "
                         f"out of requested {num_businesses}"
                     )
