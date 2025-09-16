@@ -24,35 +24,42 @@
         "keyword": {
           "type": "string",
           "title": "Keyword",
-          "description": "e.g., plumbers, dentists"
+          "description": "e.g., plumbers, dentists",
+          "editor": "textfield"
         },
         "location": {
           "type": "string",
           "title": "Location",
-          "description": "e.g., Austin, TX"
+          "description": "e.g., Austin, TX",
+          "editor": "textfield"
         },
         "searchUrl": {
           "type": "string",
           "format": "uri",
           "title": "Yelp search URL",
-          "description": "Direct Yelp search URL (overrides keyword/location)"
+          "description": "Direct Yelp search URL (overrides keyword/location)",
+          "editor": "textfield"
         },
         "queries": {
           "type": "array",
           "description": "Array of query objects, each with 'keyword' and 'location'.",
           "title": "Query objects",
+          "editor": "array",
           "items": {
             "type": "object",
+            "editor": "object",
             "properties": {
               "keyword": {
                 "type": "string",
                 "title": "Keyword",
-                "description": "e.g., plumbers"
+                "description": "e.g., plumbers",
+                "editor": "textfield"
               },
               "location": {
                 "type": "string",
                 "title": "Location",
-                "description": "e.g., Austin, TX"
+                "description": "e.g., Austin, TX",
+                "editor": "textfield"
               }
             },
             "required": ["keyword", "location"]
@@ -62,19 +69,22 @@
           "type": "array",
           "description": "List of keywords to combine with locations (cross-product if multiple).",
           "title": "Keywords list",
-          "items": { "type": "string" }
+          "editor": "array",
+          "items": { "type": "string", "editor": "textfield" }
         },
         "locations": {
           "type": "array",
           "description": "List of locations to combine with keywords (cross-product if multiple).",
           "title": "Locations list",
-          "items": { "type": "string" }
+          "editor": "array",
+          "items": { "type": "string", "editor": "textfield" }
         },
         "searchUrls": {
           "type": "array",
           "description": "Direct Yelp search URLs to process.",
           "title": "Yelp search URLs",
-          "items": { "type": "string", "format": "uri" }
+          "editor": "array",
+          "items": { "type": "string", "format": "uri", "editor": "textfield" }
         },
         "numBusinesses": {
           "type": "integer",
@@ -82,7 +92,8 @@
           "description": "Max 500",
           "default": 50,
           "minimum": 1,
-          "maximum": 500
+          "maximum": 500,
+          "editor": "number"
         },
         "concurrency": {
           "type": "integer",
@@ -90,53 +101,62 @@
           "description": "Clamped 3–5 for stability",
           "default": 5,
           "minimum": 3,
-          "maximum": 5
+          "maximum": 5,
+          "editor": "number"
         },
         "naturalNavigation": {
           "type": "boolean",
           "title": "Use natural navigation via search engines",
-          "default": false
+          "default": false,
+          "editor": "checkbox"
         },
         "perBusinessIsolation": {
           "type": "boolean",
           "title": "Isolate browser context per business",
-          "default": false
+          "default": false,
+          "editor": "checkbox"
         },
         "entryFlowRatios": {
           "type": "string",
           "title": "Entry flow ratios",
           "description": "google:0.6,direct:0.3,bing:0.1",
-          "default": "google:0.6,direct:0.3,bing:0.1"
+          "default": "google:0.6,direct:0.3,bing:0.1",
+          "editor": "textfield"
         },
         "debugSnapshot": {
           "type": "boolean",
           "title": "Save HTML snapshots for debugging",
-          "default": false
+          "default": false,
+          "editor": "checkbox"
         },
         "grokModel": {
           "type": "string",
           "title": "Grok model",
           "description": "e.g., grok-2",
-          "default": "grok-2"
+          "default": "grok-2",
+          "editor": "textfield"
         },
         "country": {
           "type": "string",
           "title": "Proxy country",
-          "description": "Two-letter code, e.g., US"
+          "description": "Two-letter code, e.g., US",
+          "editor": "textfield"
         },
         "captchaTimeoutSeconds": {
           "type": "integer",
           "title": "CAPTCHA timeout (seconds)",
           "default": 300,
           "minimum": 60,
-          "maximum": 1200
+          "maximum": 1200,
+          "editor": "number"
         },
         "emailMaxContactPages": {
           "type": "integer",
           "title": "Max contact pages to crawl",
           "default": 10,
           "minimum": 1,
-          "maximum": 20
+          "maximum": 20,
+          "editor": "number"
         }
       }
     }
