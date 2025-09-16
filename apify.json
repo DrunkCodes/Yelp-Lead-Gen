@@ -35,7 +35,6 @@
         },
         "searchUrl": {
           "type": "string",
-          "format": "uri",
           "title": "Yelp search URL",
           "description": "Direct Yelp search URL (overrides keyword/location)",
           "editor": "textfield"
@@ -84,7 +83,7 @@
           "description": "Direct Yelp search URLs to process.",
           "title": "Yelp search URLs",
           "editor": "array",
-          "items": { "type": "string", "format": "uri", "editor": "textfield" }
+          "items": { "type": "string", "editor": "textfield" }
         },
         "numBusinesses": {
           "type": "integer",
