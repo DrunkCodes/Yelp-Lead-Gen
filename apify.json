@@ -1,0 +1,72 @@
+{
+  "name": "yelp-scraper-grok-crawl4ai",
+  "version": "0.1.0",
+  "buildTag": "latest",
+  "title": "Yelp Scraper – Playwright + Crawl4AI + Grok",
+  "description": "Production-grade actor that extracts enriched business data (name, rating, reviews, phone, website, email, etc.) from Yelp using Playwright with Apify Residential proxy, Crawl4AI schema extraction and Grok LLM fallback.",
+  "categories": ["scraper", "data-extraction", "lead-generation"],
+  "environmentVariables": [
+    { "name": "GROK_API_KEY", "description": "xAI API key for Grok (OpenAI-compatible)", "required": false },
+    { "name": "APIFY_PROXY_PASSWORD", "description": "Provided by Apify platform", "required": true },
+    { "name": "TWO_CAPTCHA_API_KEY", "description": "2Captcha API key for automatic solving of reCAPTCHA, hCaptcha and Turnstile challenges", "required": false }
+  ],
+  "dockerfile": "Dockerfile",
+  "cmd": "python main.py",
+  "input": {
+    "schema": {
+      "type": "object",
+      "properties": {
+        "keyword": { "type": "string" },
+        "location": { "type": "string" },
+        "searchUrl": { "type": "string" },
+        "queries": {
+          "type": "array",
+          "description": "Array of query objects, each with 'keyword' and 'location'.",
+          "items": {
+            "type": "object",
+            "properties": {
+              "keyword": { "type": "string" },
+              "location": { "type": "string" }
+            },
+            "required": ["keyword", "location"]
+          }
+        },
+        "keywords": {
+          "type": "array",
+          "description": "List of keywords to combine with locations (cross-product if multiple).",
+          "items": { "type": "string" }
+        },
+        "locations": {
+          "type": "array",
+          "description": "List of locations to combine with keywords (cross-product if multiple).",
+          "items": { "type": "string" }
+        },
+        "searchUrls": {
+          "type": "array",
+          "description": "Direct Yelp search URLs to process.",
+          "items": { "type": "string", "format": "uri" }
+        },
+        "numBusinesses": { "type": "integer", "default": 50, "maximum": 500 },
+        "concurrency": { "type": "integer", "default": 5, "minimum": 3, "maximum": 5 },
+        "naturalNavigation": { "type": "boolean", "default": false },
+        "perBusinessIsolation": { "type": "boolean", "default": false },
+        "entryFlowRatios": { "type": "string", "default": "google:0.6,direct:0.3,bing:0.1" },
+        "debugSnapshot": { "type": "boolean", "default": false },
+        "grokModel": { "type": "string", "default": "grok-2" },
+        "country": { "type": "string" },
+        "captchaTimeoutSeconds": {
+          "type": "integer",
+          "default": 300,
+          "minimum": 60,
+          "maximum": 1200
+        },
+        "emailMaxContactPages": {
+          "type": "integer",
+          "default": 10,
+          "minimum": 1,
+          "maximum": 20
+        }
+      }
+    }
+  }
+}
