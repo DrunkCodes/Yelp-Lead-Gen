@@ -16,7 +16,7 @@ from apify import Actor
 from playwright.async_api import BrowserContext, Page, Response
 
 from app.models.schemas import YelpBusiness, compute_years_in_business, merge_business_data
-from app.scrapers.base import BaseScraper
+from app.scrapers.base import BaseScraper, SoftBlockError, CaptchaError
 from app.services.crawl4ai_client import extract_with_crawl4ai, is_crawl4ai_available
 from app.services.email_extractor import extract_email_from_website
 from app.services.llm_structured import extract_structured_from_html
@@ -107,9 +107,12 @@ class YelpScraper(BaseScraper):
                 
                 await Actor.log.info(f"Using natural navigation via {entry_flow}")
                 
-                try:
-                    # Navigate to the search engine
-                    await self.navigate(page, engine_url)
+                # retry loop with reroll
+                max_rerolls = 3
+                for reroll_idx in range(max_rerolls + 1):
+                    try:
+                        # Navigate to the search engine
+                        await self.navigate(page, engine_url)
                     
                     # Look for Yelp links
                     yelp_link_selector = 'a[href*="yelp.com"]'
@@ -132,12 +135,35 @@ class YelpScraper(BaseScraper):
                         await Actor.log.info(f"Natural navigation successful, landed on: {yelp_url}")
                     else:
                         await Actor.log.warning("No Yelp links found in search results, falling back to direct navigation")
-                except Exception as e:
-                    await Actor.log.warning(f"Natural navigation failed: {e}, falling back to direct navigation")
+                        break
+                    except (SoftBlockError, CaptchaError) as e:
+                        if reroll_idx < max_rerolls:
+                            await Actor.log.warning(
+                                f"Soft block/ CAPTCHA ({e}) on engine entry, reroll {reroll_idx+1}/{max_rerolls}")
+                            context = await self.reroll_identity(context, 'yelp', True)
+                            page = await context.new_page()
+                        else:
+                            await Actor.log.warning("Natural navigation failed after rerolls, falling back to direct navigation")
+                            break
+                    except Exception as e:
+                        await Actor.log.warning(f"Natural navigation failed: {e}, falling back to direct navigation")
+                        break
             
             # If we're not already on a search results page, navigate to the search URL
             if not re.search(r'/search\?', page.url):
-                await self.navigate(page, yelp_url, referer)
+                max_rerolls = 3
+                for reroll_idx in range(max_rerolls + 1):
+                    try:
+                        await self.navigate(page, yelp_url, referer)
+                        break
+                    except (SoftBlockError, CaptchaError) as e:
+                        if reroll_idx < max_rerolls:
+                            await Actor.log.warning(
+                                f"Soft block/ CAPTCHA on Yelp search page ({e}), reroll {reroll_idx+1}/{max_rerolls}")
+                            context = await self.reroll_identity(context, 'yelp', True)
+                            page = await context.new_page()
+                        else:
+                            raise
             
             # Collect business links
             business_links = await self.collect_business_links(
@@ -383,8 +409,20 @@ class YelpScraper(BaseScraper):
                 # Create a new page
                 page = await context.new_page()
                 
-                # Navigate to the business page
-                await self.navigate(page, url, referer)
+                # Navigate to the business page with reroll logic
+                max_rerolls = 3
+                for reroll_idx in range(max_rerolls + 1):
+                    try:
+                        await self.navigate(page, url, referer)
+                        break
+                    except (SoftBlockError, CaptchaError) as e:
+                        if reroll_idx < max_rerolls:
+                            await Actor.log.warning(
+                                f"Soft block/ CAPTCHA on business page ({e}), reroll {reroll_idx+1}/{max_rerolls}")
+                            context = await self.reroll_identity(context, 'yelp', True)
+                            page = await context.new_page()
+                        else:
+                            raise
                 
                 # Save snapshot if debug is enabled
                 if self.snapshots_store:

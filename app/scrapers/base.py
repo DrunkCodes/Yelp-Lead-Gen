@@ -23,6 +23,18 @@ from app.utils.retry import retry_async, with_retry
 
 logger = logging.getLogger(__name__)
 
+# --------------------------------------------------------------------------- #
+# Custom scraper exceptions                                                  #
+# --------------------------------------------------------------------------- #
+
+
+class SoftBlockError(Exception):
+    """Raised when a soft block (e.g. anti-bot / rate-limit page) is detected."""
+
+
+class CaptchaError(Exception):
+    """Raised when a CAPTCHA is encountered and cannot be bypassed."""
+
 # User agent strings for randomization
 USER_AGENTS = [
     'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
@@ -462,20 +474,20 @@ class BaseScraper:
                         
                         # If still blocked or has CAPTCHA, raise exception
                         if is_blocked or has_captcha:
-                            raise Exception(f"Still blocked after solving CAPTCHA at {url}")
+                            raise CaptchaError(f"Still blocked after solving CAPTCHA at {url}")
                     else:
                         logger.warning("Failed to solve CAPTCHA")
                         if self.metrics:
                             self.metrics["captcha_failed"] = self.metrics.get("captcha_failed", 0) + 1
-                        raise Exception(f"Failed to solve CAPTCHA at {url}")
+                        raise CaptchaError(f"Failed to solve CAPTCHA at {url}")
                 else:
                     # No solver available
-                    raise Exception(f"CAPTCHA detected at {url} but no solver configured")
+                    raise CaptchaError(f"CAPTCHA detected at {url} but no solver configured")
             
             if is_blocked:
                 if self.metrics:
                     self.metrics["soft_blocks"] = self.metrics.get("soft_blocks", 0) + 1
-                raise Exception(f"Soft block detected at {url}")
+                raise SoftBlockError(f"Soft block detected at {url}")
             
             # Try to accept cookies
             await self.accept_cookies(page)
