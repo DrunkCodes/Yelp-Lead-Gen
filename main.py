@@ -131,14 +131,12 @@ async def main():
             Actor.log.warning(f"Failed to parse entryFlowRatios: {e}. Using defaults.")
             entry_flow_ratios = {'google': 0.6, 'direct': 0.3, 'bing': 0.1}
         
-        # Set up proxy configuration
-        proxy_config_options = {
-            'groups': ['RESIDENTIAL']
-        }
-        if country:
-            proxy_config_options['countryCode'] = country
-            
-        proxy_configuration = await Actor.create_proxy_configuration(proxy_config_options)
+        # ------------------------------------------------------------------
+        # 2) Proxy configuration (SDK v2 automatically uses env variables)
+        # ------------------------------------------------------------------
+        # Simply create a ProxyConfiguration instance without arguments.
+        # The Apify platform injects all required credentials via env vars.
+        proxy_configuration = await Actor.create_proxy_configuration()
         if not proxy_configuration:
             Actor.log.warning("No proxy configuration available. Proceeding without proxy.")
         else:
@@ -207,6 +205,10 @@ async def main():
             browser_proxy = None
             if proxy_configuration:
                 proxy_url = await proxy_configuration.new_url()
+                # Inject country code into the proxy URL if requested and not present
+                if country and "country=" not in proxy_url:
+                    separator = "&" if "?" in proxy_url else "?"
+                    proxy_url = f"{proxy_url}{separator}country={country}"
                 parsed = urlparse(proxy_url)
                 browser_proxy = {
                     "server": f"{parsed.scheme}://{parsed.netloc}",
