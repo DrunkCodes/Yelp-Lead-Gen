@@ -63,8 +63,13 @@ class YelpScraper(BaseScraper):
             natural_navigation: Whether to use natural navigation via search engines
             entry_flow_ratios: Ratios for different entry flows (e.g., {'google': 0.6, 'direct': 0.3, 'bing': 0.1})
         """
-        # Load session profiles
-        await self._load_session_profiles('yelp', 5)
+        # Start each Actor run with a clean slate to reduce bot-detection risk.
+        # Apify storage is not persisted between independent runs anyway, so
+        # restoring session cookies provides no real benefit but does increase
+        # the chance the cookie profile is already flagged.  Therefore we skip
+        # loading historical session profiles here.
+        #
+        # await self._load_session_profiles('yelp', 5)
         
         # Determine the entry flow
         if not entry_flow_ratios:

@@ -221,9 +221,25 @@ async def main():
                 
                 Actor.log.info(f"Configured Playwright with Residential proxy: {parsed.netloc}")
             
+            # Launch Chromium with additional stealth arguments to reduce bot detection
             browser = await playwright.chromium.launch(
                 headless=True,
-                proxy=browser_proxy
+                proxy=browser_proxy,
+                args=[
+                    '--disable-blink-features=AutomationControlled',
+                    '--disable-dev-shm-usage',
+                    '--disable-web-security',
+                    '--disable-features=IsolateOrigins,site-per-process',
+                    '--no-sandbox',
+                    '--disable-setuid-sandbox',
+                    '--disable-accelerated-2d-canvas',
+                    '--disable-gpu',
+                    '--window-size=1920,1080',
+                    '--start-maximized',
+                    '--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) '
+                    'AppleWebKit/537.36 (KHTML, like Gecko) '
+                    'Chrome/120.0.0.0 Safari/537.36',
+                ],
             )
             
             try:

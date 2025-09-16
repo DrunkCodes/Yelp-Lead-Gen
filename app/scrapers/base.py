@@ -173,7 +173,8 @@ class BaseScraper:
         for i in range(count):
             profile_key = f'{domain_key}/profile_{i}.json'
             try:
-                profile_data = await self.sessions_store.get(profile_key)
+                    # SDK v2 ➜ use `get_value`
+                    profile_data = await self.sessions_store.get_value(profile_key)
                 if profile_data:
                     self.session_profiles[profile_key] = profile_data
                     logger.info(f"Loaded session profile: {profile_key}")
@@ -193,7 +194,8 @@ class BaseScraper:
         
         try:
             storage_state = await context.storage_state()
-            await self.sessions_store.set(profile_key, storage_state)
+            # SDK v2 ➜ use `set_value`
+            await self.sessions_store.set_value(profile_key, storage_state)
             self.session_profiles[profile_key] = storage_state
             logger.info(f"Saved session profile: {profile_key}")
         except Exception as e:
@@ -716,7 +718,8 @@ class BaseScraper:
             content = await page.content()
             
             # Save to key-value store
-            await self.snapshots_store.set(key, content)
+            # SDK v2 ➜ use `set_value`
+            await self.snapshots_store.set_value(key, content)
             
             logger.info(f"Saved snapshot: {key}")
             return key
