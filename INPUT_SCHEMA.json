@@ -28,22 +28,18 @@
       "type": "array",
       "description": "Array of query objects, each with 'keyword' and 'location'.",
       "title": "Query objects",
-      "editor": "array",
       "items": {
         "type": "object",
-        "editor": "object",
         "properties": {
           "keyword": {
             "type": "string",
             "title": "Keyword",
-            "description": "e.g., plumbers",
-            "editor": "textfield"
+            "description": "e.g., plumbers"
           },
           "location": {
             "type": "string",
             "title": "Location",
-            "description": "e.g., Austin, TX",
-            "editor": "textfield"
+            "description": "e.g., Austin, TX"
           }
         },
         "required": ["keyword", "location"]
@@ -53,22 +49,19 @@
       "type": "array",
       "description": "List of keywords to combine with locations (cross-product if multiple).",
       "title": "Keywords list",
-      "editor": "array",
-      "items": { "type": "string", "editor": "textfield" }
+      "items": { "type": "string" }
     },
     "locations": {
       "type": "array",
       "description": "List of locations to combine with keywords (cross-product if multiple).",
       "title": "Locations list",
-      "editor": "array",
-      "items": { "type": "string", "editor": "textfield" }
+      "items": { "type": "string" }
     },
     "searchUrls": {
       "type": "array",
       "description": "Direct Yelp search URLs to process.",
       "title": "Yelp search URLs",
-      "editor": "array",
-      "items": { "type": "string", "editor": "textfield" }
+      "items": { "type": "string" }
     },
     "numBusinesses": {
       "type": "integer",
