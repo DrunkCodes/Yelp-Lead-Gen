@@ -50,18 +50,21 @@
       "type": "array",
       "description": "List of keywords to combine with locations (cross-product if multiple).",
       "title": "Keywords list",
+      "editor": "json",
       "items": { "type": "string" }
     },
     "locations": {
       "type": "array",
       "description": "List of locations to combine with keywords (cross-product if multiple).",
       "title": "Locations list",
+      "editor": "json",
       "items": { "type": "string" }
     },
     "searchUrls": {
       "type": "array",
       "description": "Direct Yelp search URLs to process.",
       "title": "Yelp search URLs",
+      "editor": "json",
       "items": { "type": "string" }
     },
     "numBusinesses": {
