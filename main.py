@@ -325,4 +325,5 @@ async def main():
 
 if __name__ == "__main__":
     # Run the Actor
-    Actor.main(main)
+    # SDK ≥ 2.0 uses `Actor.run` as the entrypoint helper
+    Actor.run(main)
