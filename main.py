@@ -173,9 +173,11 @@ async def main():
         else:
             Actor.log.info("2Captcha solver enabled for handling CAPTCHA challenges.")
         
-        # Open key-value stores for sessions and debug snapshots
-        sessions_store = await Actor.open_key_value_store('sessions')
-        snapshots_store = await Actor.open_key_value_store('snapshots') if debug_snapshot else None
+        # Open key-value stores (SDK v2: pass name via keyword argument)
+        sessions_store = await Actor.open_key_value_store(name="sessions")
+        snapshots_store = (
+            await Actor.open_key_value_store(name="snapshots") if debug_snapshot else None
+        )
         
         # Log that robots.txt is being ignored per configuration
         Actor.log.info("Robots.txt checking disabled per configuration. Proceeding regardless of robots.txt rules.")
