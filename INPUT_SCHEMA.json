@@ -1,5 +1,6 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
+  "schemaVersion": 1,
   "title": "Yelp Scraper Input",
   "description": "Provide either keyword+location or a direct Yelp search URL. Advanced arrays are optional.",
   "type": "object",
