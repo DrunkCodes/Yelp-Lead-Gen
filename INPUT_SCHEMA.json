@@ -28,6 +28,7 @@
       "type": "array",
       "description": "Array of query objects, each with 'keyword' and 'location'.",
       "title": "Query objects",
+      "editor": "json",
       "items": {
         "type": "object",
         "properties": {
