@@ -113,29 +113,35 @@ class YelpScraper(BaseScraper):
                     try:
                         # Navigate to the search engine
                         await self.navigate(page, engine_url)
-                    
-                    # Look for Yelp links
-                    yelp_link_selector = 'a[href*="yelp.com"]'
-                    await page.wait_for_selector(yelp_link_selector, timeout=10000)
-                    
-                    # Get all Yelp links
-                    yelp_links = await page.query_selector_all(yelp_link_selector)
-                    
-                    if yelp_links:
-                        # Click the first Yelp link
-                        await yelp_links[0].click()
-                        
-                        # Wait for navigation
-                        await page.wait_for_load_state('domcontentloaded')
-                        
-                        # Update the Yelp URL and referer
-                        yelp_url = page.url
-                        referer = engine_url
-                        
-                        await Actor.log.info(f"Natural navigation successful, landed on: {yelp_url}")
-                    else:
-                        await Actor.log.warning("No Yelp links found in search results, falling back to direct navigation")
-                        break
+                        # Look for Yelp links
+                        yelp_link_selector = 'a[href*="yelp.com"]'
+                        await page.wait_for_selector(yelp_link_selector, timeout=10000)
+
+                        # Get all Yelp links
+                        yelp_links = await page.query_selector_all(yelp_link_selector)
+
+                        if yelp_links:
+                            # Click the first Yelp link
+                            await yelp_links[0].click()
+
+                            # Wait for navigation
+                            await page.wait_for_load_state('domcontentloaded')
+
+                            # Update the Yelp URL and referer
+                            yelp_url = page.url
+                            referer = engine_url
+
+                            await Actor.log.info(
+                                f"Natural navigation successful, landed on: {yelp_url}"
+                            )
+
+                            # Success – exit reroll loop
+                            break
+                        else:
+                            await Actor.log.warning(
+                                "No Yelp links found in search results, falling back to direct navigation"
+                            )
+                            break
                     except (SoftBlockError, CaptchaError) as e:
                         if reroll_idx < max_rerolls:
                             await Actor.log.warning(
