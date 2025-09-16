@@ -17,3 +17,6 @@ anyio>=4.3.0,<5
 
 # Note: 2captcha integration uses httpx for API calls, no additional packages required
 # Set TWO_CAPTCHA_API_KEY env variable to enable automatic CAPTCHA solving
+
+# Environment variable loader
+python-dotenv>=1.0.1,<2

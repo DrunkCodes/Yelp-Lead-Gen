@@ -13,11 +13,17 @@ from urllib.parse import urlparse
 
 from apify import Actor
 from playwright.async_api import async_playwright
+from dotenv import load_dotenv  # NEW
 
 # Import our modules
 from app.scrapers.yelp_scraper import YelpScraper
 from app.services.crawl4ai_client import configure_crawl4ai
 from app.services.llm_structured import configure_llm
+
+# Load environment variables from a local .env file (if present) for
+# convenient local development. This is a no-op on Apify platform where
+# variables are injected directly into the environment.
+load_dotenv()
 
 
 async def main():
