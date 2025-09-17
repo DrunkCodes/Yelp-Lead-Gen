@@ -173,8 +173,8 @@ class BaseScraper:
         for i in range(count):
             profile_key = f'{domain_key}/profile_{i}.json'
             try:
-                    # SDK v2 ➜ use `get_value`
-                    profile_data = await self.sessions_store.get_value(profile_key)
+                # SDK v2 ➜ use `get_value`
+                profile_data = await self.sessions_store.get_value(profile_key)
                 if profile_data:
                     self.session_profiles[profile_key] = profile_data
                     logger.info(f"Loaded session profile: {profile_key}")
