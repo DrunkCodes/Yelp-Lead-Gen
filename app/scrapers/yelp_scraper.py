@@ -250,81 +250,148 @@ class YelpScraper(BaseScraper):
         referer: Optional[str] = None
     ) -> List[str]:
         """
-        Collect business links from search results pages.
-        
-        Args:
-            page: Playwright page
-            num_links: Number of links to collect
-            referer: Referer URL for pagination
-            
-        Returns:
-            List of business detail page URLs
+        Collect business links from search results pages with extensive
+        debugging information so we can diagnose why no links are being found.
         """
         business_links: List[str] = []
         page_num = 1
-        max_pages = 25  # Limit to 25 pages to avoid excessive scraping
-        
+        max_pages = 25  # Safety limit
+
         while len(business_links) < num_links and page_num <= max_pages:
             Actor.log.info(f"Collecting links from page {page_num}")
-            
-            # Wait for business links to load
+
+            # ─── DEBUG SECTION ────────────────────────────────────────────────
             try:
-                await page.wait_for_selector('a[href^="/biz/"]', timeout=10000)
+                # Log URL & Title
+                current_url = page.url
+                title = await page.title()
+                Actor.log.info(f"Current page URL: {current_url}")
+                Actor.log.info(f"Page title: {title}")
+
+                # Screenshot
+                screenshot_path = f\"/tmp/yelp_page_{page_num}.png\"
+                try:
+                    await page.screenshot(path=screenshot_path, full_page=True)
+                    Actor.log.info(f\"Screenshot saved to {screenshot_path}\")
+                except Exception as ss_err:
+                    Actor.log.warning(f\"Failed to save screenshot: {ss_err}\")
+
+                # HTML snapshot
+                try:
+                    html_content = await page.content()
+                    html_path = f\"/tmp/yelp_page_{page_num}.html\"
+                    with open(html_path, \"w\", encoding=\"utf-8\") as fp:
+                        fp.write(html_content)
+                    Actor.log.info(f\"HTML saved to {html_path} (size={len(html_content)} bytes)\")
+                except Exception as html_err:
+                    Actor.log.warning(f\"Failed to save HTML snapshot: {html_err}\")
+
+                # CAPTCHA / Error detection
+                captcha_selectors = [
+                    '.g-recaptcha',
+                    '#px-captcha',
+                    'iframe[src*=\"captcha\"]',
+                    '[id*=\"captcha\"]',
+                    '[class*=\"captcha\"]',
+                ]
+                for sel in captcha_selectors:
+                    if await page.query_selector(sel):
+                        Actor.log.warning(f\"CAPTCHA detected via selector: {sel}\")
+
+                error_selectors = [
+                    '.error-message',
+                    '.no-results',
+                    '[class*=\"error\"]',
+                    '[class*=\"blocked\"]',
+                ]
+                for sel in error_selectors:
+                    el = await page.query_selector(sel)
+                    if el:
+                        msg = await el.text_content()
+                        Actor.log.warning(f\"Error/blocked element found ({sel}): {msg}\")
+
+                # Try multiple selectors to enumerate potential business links
+                test_selectors = [
+                    'a[href^=\"/biz/\"]',
+                    'a[href*=\"/biz/\"]',
+                    '[data-testid*=\"serp-ia-card\"] a',
+                    '.css-1m051bw a',
+                    'h3 a[href*=\"/biz/\"]',
+                    'a.css-1m051bw',
+                    '[class*=\"businessName\"] a',
+                    'div[class*=\"container\"] a[href*=\"/biz/\"]',
+                    'section a[href*=\"/biz/\"]',
+                ]
+                found_any = False
+                for sel in test_selectors:
+                    cnt = await page.locator(sel).count()
+                    if cnt:
+                        found_any = True
+                        Actor.log.info(f\"Selector {sel!r} matched {cnt} elements\")
+                        # Log up to first 3 href samples
+                        for i in range(min(cnt, 3)):
+                            try:
+                                sample = await page.locator(sel).nth(i).get_attribute(\"href\")
+                                Actor.log.info(f\"  sample href: {sample}\")
+                            except Exception:
+                                pass
+                if not found_any:
+                    Actor.log.error(\"No business link elements found with any selector\")
+                    # Show a few generic link samples that contain 'biz'
+                    all_a_tags = await page.query_selector_all('a')
+                    biz_samples = []
+                    for a in all_a_tags[:50]:
+                        try:
+                            href = await a.get_attribute('href')
+                            if href and 'biz' in href.lower():
+                                biz_samples.append(href)
+                        except Exception:
+                            pass
+                    if biz_samples:
+                        Actor.log.info(f\"Found {len(biz_samples)} raw links containing 'biz'. Sample: {biz_samples[:5]}\")
+            except Exception as dbg_err:
+                Actor.log.error(f\"Debug logging failed: {dbg_err}\")
+            # ─── END DEBUG SECTION ────────────────────────────────────────────
+
+            # Wait for primary selector to appear
+            try:
+                await page.wait_for_selector('a[href^=\"/biz/\"]', timeout=10_000)
             except Exception as e:
-                Actor.log.warning(f"No business links found on page {page_num}: {e}")
+                Actor.log.warning(f\"No business links found on page {page_num}: {e}\")
                 break
-            
-            # Extract business links
-            links = await page.query_selector_all('a[href^="/biz/"]')
-            
-            # Process links
+
+            links = await page.query_selector_all('a[href^=\"/biz/\"]')
+
             for link in links:
                 try:
                     href = await link.get_attribute('href')
                     if not href:
                         continue
-                    
-                    # Normalize the URL
                     full_url = urljoin('https://www.yelp.com', href)
-                    
-                    # Skip links with query parameters (often not business detail pages)
                     if '?' in full_url:
                         continue
-                    
-                    # Skip links to reviews, photos, etc.
-                    if any(segment in full_url for segment in ['/review/', '/reviews/', '/photos/', '/menu/', '/questions/']):
+                    if any(seg in full_url for seg in ['/review/', '/reviews/', '/photos/', '/menu/', '/questions/']):
                         continue
-                    
-                    # Skip already seen URLs
                     if full_url in self.seen_business_urls:
                         continue
-                    
-                    # Add to the list and mark as seen
+
                     business_links.append(full_url)
                     self.seen_business_urls.add(full_url)
-                    
-                    # Break if we have enough links
                     if len(business_links) >= num_links:
                         break
-                        
-                except Exception as e:
-                    Actor.log.warning(f"Error processing link: {e}")
-            
-            # Check if we have enough links
+                except Exception as link_err:
+                    Actor.log.warning(f\"Error processing link: {link_err}\")
+
             if len(business_links) >= num_links:
                 break
-            
-            # Try to go to the next page
-            next_page = await self._go_to_next_page(page, referer)
-            if not next_page:
-                # Try infinite scroll as a fallback
-                scrolled = await self._try_infinite_scroll(page)
-                if not scrolled:
-                    Actor.log.info("No more pages available")
+
+            # Pagination or infinite-scroll fallback
+            if not await self._go_to_next_page(page, referer):
+                if not await self._try_infinite_scroll(page):
+                    Actor.log.info(\"No more pages available; stopping link collection.\")
                     break
-            
             page_num += 1
-        
+
         return business_links
     
     async def _go_to_next_page(self, page: Page, referer: Optional[str] = None) -> bool:

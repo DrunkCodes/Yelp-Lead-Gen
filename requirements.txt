@@ -8,7 +8,7 @@ httpx>=0.27.0,<1  # Used for both HTTP requests and 2captcha API calls when TWO_
 aiolimiter>=1.1.0,<2
 
 # Extraction and parsing
-crawl4ai>=0.7.0,<1
+# crawl4ai>=0.7.0,<1  # Not available on PyPI, using fallback extraction methods
 pydantic>=2.6.0,<3
 
 # Utilities
