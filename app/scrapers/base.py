@@ -387,9 +387,17 @@ class BaseScraper:
             context: Browser context to close
         """
         try:
-            # Save storage state if profile key exists
-            if hasattr(context, '_profile_key'):
-                await self._save_session_profile(context, context._profile_key)  # type: ignore
+            # ------------------------------------------------------------------
+            # Session saving disabled
+            # ------------------------------------------------------------------
+            # Persisting cookies between independent Actor runs on Apify is not
+            # useful (stores are ephemeral between runs) and the previous save/
+            # load logic caused API-compatibility issues.  We therefore skip
+            # saving session profiles altogether to avoid unnecessary KV-store
+            # operations and potential errors.
+            #
+            # if hasattr(context, '_profile_key'):
+            #     await self._save_session_profile(context, context._profile_key)  # type: ignore
             
             # Close the context
             await context.close()
@@ -452,39 +460,15 @@ class BaseScraper:
             is_blocked = await self.soft_blocked(page)
             has_captcha = await self.has_captcha(page)
             
-            # Try to solve CAPTCHA if detected and solver is available
+            # Yelp presents a proprietary CAPTCHA that common solvers cannot handle
+            # reliably.  Instead of wasting solver credits and time, immediately
+            # bail out and let the retry / identity-reroll mechanism handle it.
             if has_captcha:
                 if self.metrics:
                     self.metrics["captcha_hits"] = self.metrics.get("captcha_hits", 0) + 1
-                
-                if self.solver_api_key:
-                    logger.info("CAPTCHA detected, attempting to solve with 2Captcha")
-                    solved = await solve_captcha(
-                        page,
-                        self.solver_api_key,
-                        timeout=self.captcha_timeout
-                    )
-                    
-                    if solved:
-                        logger.info("CAPTCHA solved successfully")
-                        if self.metrics:
-                            self.metrics["captcha_solved"] = self.metrics.get("captcha_solved", 0) + 1
-                        
-                        # Recheck page state after solving
-                        is_blocked = await self.soft_blocked(page)
-                        has_captcha = await self.has_captcha(page)
-                        
-                        # If still blocked or has CAPTCHA, raise exception
-                        if is_blocked or has_captcha:
-                            raise CaptchaError(f"Still blocked after solving CAPTCHA at {url}")
-                    else:
-                        logger.warning("Failed to solve CAPTCHA")
-                        if self.metrics:
-                            self.metrics["captcha_failed"] = self.metrics.get("captcha_failed", 0) + 1
-                        raise CaptchaError(f"Failed to solve CAPTCHA at {url}")
-                else:
-                    # No solver available
-                    raise CaptchaError(f"CAPTCHA detected at {url} but no solver configured")
+                # Brief pause to avoid hammering the target when CAPTCHA appears.
+                await asyncio.sleep(random.uniform(2.0, 5.0))
+                raise CaptchaError(f"CAPTCHA detected at {url}, will retry with new identity")
             
             if is_blocked:
                 if self.metrics:

@@ -169,9 +169,9 @@ async def main():
         captcha_solver_enabled = bool(two_captcha_api_key)
         
         if not captcha_solver_enabled:
-            Actor.log.info("TWO_CAPTCHA_API_KEY not provided. CAPTCHA solver will be disabled.")
+            Actor.log.info("TWO_CAPTCHA_API_KEY not provided. Will retry with new identity on CAPTCHA.")
         else:
-            Actor.log.info("2Captcha solver enabled for handling CAPTCHA challenges.")
+            Actor.log.info("2Captcha API key provided (not used for Yelp's custom CAPTCHA).")
         
         # Open key-value stores (SDK v2: pass name via keyword argument)
         sessions_store = await Actor.open_key_value_store(name="sessions")
@@ -329,10 +329,9 @@ async def main():
                 Actor.log.info(f"Emails missing: {metrics['email_missing']}")
                 Actor.log.info(f"Soft blocks encountered: {metrics['soft_blocks']}")
                 Actor.log.info(f"CAPTCHA challenges: {metrics['captcha_hits']}")
-                
-                if captcha_solver_enabled:
-                    Actor.log.info(f"CAPTCHAs solved: {metrics.get('captcha_solved', 0)}")
-                    Actor.log.info(f"CAPTCHA solving failures: {metrics.get('captcha_failed', 0)}")
+
+                # For Yelp we do not actually solve CAPTCHAs via 2Captcha,
+                # therefore omit misleading “solved / failures” logs.
                 
                 Actor.log.info(f"Identity rerolls: {metrics['rerolls']}")
                 Actor.log.info(f"Errors: {metrics['errors']}")
