@@ -116,7 +116,7 @@ class YelpScraper(BaseScraper):
                 try:
                     await asyncio.wait_for(
                         self._attempt_natural_navigation(page, context, engine_url),
-                        timeout=30.0
+                        timeout=15.0
                     )
                     # success – update referer / target
                     if page.url != engine_url:
@@ -124,7 +124,10 @@ class YelpScraper(BaseScraper):
                         referer = engine_url
                         Actor.log.info(f"Natural navigation successful, landed on: {yelp_url}")
                 except asyncio.TimeoutError:
-                    Actor.log.warning(f"Natural navigation via {entry_flow} timed-out (30 s). Using direct navigation.")
+                    Actor.log.warning(
+                        f"Natural navigation via {entry_flow} blocked or timed out (15s). "
+                        "Using direct navigation."
+                    )
                 except Exception as e:
                     Actor.log.warning(f"Natural navigation failed: {e}. Falling back to direct navigation.")
             
