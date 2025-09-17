@@ -85,13 +85,6 @@
       "maximum": 5,
       "editor": "number"
     },
-    "naturalNavigation": {
-      "type": "boolean",
-      "title": "Use natural navigation via search engines",
-      "description": "Navigate to Yelp via search engines for more natural traffic patterns",
-      "default": false,
-      "editor": "checkbox"
-    },
     "perBusinessIsolation": {
       "type": "boolean",
       "title": "Isolate browser context per business",

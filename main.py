@@ -99,7 +99,9 @@ async def main():
         requested_concurrency = int(actor_input.get('concurrency', 5) or 5)
         concurrency = max(3, min(5, requested_concurrency))
         Actor.log.info(f"Concurrency set to {concurrency} (requested {requested_concurrency})")
-        natural_navigation = actor_input.get('naturalNavigation', False)
+        # Natural navigation is now always enabled for better bot avoidance.
+        # The `naturalNavigation` input option has been deprecated.
+        natural_navigation = True
         per_business_isolation = actor_input.get('perBusinessIsolation', False)
         entry_flow_ratios_str = actor_input.get('entryFlowRatios', 'google:0.6,direct:0.3,bing:0.1')
         debug_snapshot = actor_input.get('debugSnapshot', False)

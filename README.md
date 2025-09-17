@@ -31,7 +31,6 @@ Each dataset item contains exactly eight keys:
 | `searchUrls` | array\<string\> | – | Direct Yelp search URLs processed as-is (skips keyword/location building). |
 | `numBusinesses` | integer | **50** | Max 500. Stops when reached or pages exhausted. |
 | `concurrency` | integer | **5** | Actor clamps the value between **3 – 5**; governs parallel detail fetches (HTTP & LLM guarded internally). |
-| `naturalNavigation` | boolean | **false** | Start from Google/Bing instead of hitting Yelp directly. |
 | `perBusinessIsolation` | boolean | **false** | Use fresh Playwright context per business (slower, stealthier). |
 | `entryFlowRatios` | string | `"google:0.6,direct:0.3,bing:0.1"` | Weights for entry modes, normalized automatically. |
 | `debugSnapshot` | boolean | **false** | Save HTML snapshots to KV store for troubleshooting. |
@@ -78,8 +77,7 @@ apify run . -p \
   -i '{
         "keyword": "cafes",
         "location": "Seattle, WA",
-        "numBusinesses": 3,
-        "naturalNavigation": false
+        "numBusinesses": 3
       }'
 ```
 
