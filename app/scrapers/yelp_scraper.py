@@ -109,56 +109,24 @@ class YelpScraper(BaseScraper):
             if entry_flow != 'direct' and entry_flow in self.search_engines:
                 search_query = f"{keyword} {location}" if keyword and location else "yelp"
                 engine_url = self.search_engines[entry_flow].format(query=quote(search_query))
-                
+
                 Actor.log.info(f"Using natural navigation via {entry_flow}")
-                
-                # retry loop with reroll
-                max_rerolls = 3
-                for reroll_idx in range(max_rerolls + 1):
-                    try:
-                        # Navigate to the search engine
-                        await self.navigate(page, engine_url)
-                        # Look for Yelp links
-                        yelp_link_selector = 'a[href*="yelp.com"]'
-                        await page.wait_for_selector(yelp_link_selector, timeout=10000)
 
-                        # Get all Yelp links
-                        yelp_links = await page.query_selector_all(yelp_link_selector)
-
-                        if yelp_links:
-                            # Click the first Yelp link
-                            await yelp_links[0].click()
-
-                            # Wait for navigation
-                            await page.wait_for_load_state('domcontentloaded')
-
-                            # Update the Yelp URL and referer
-                            yelp_url = page.url
-                            referer = engine_url
-
-                            Actor.log.info(
-                                f"Natural navigation successful, landed on: {yelp_url}"
-                            )
-
-                            # Success – exit reroll loop
-                            break
-                        else:
-                            Actor.log.warning(
-                                "No Yelp links found in search results, falling back to direct navigation"
-                            )
-                            break
-                    except (SoftBlockError, CaptchaError) as e:
-                        if reroll_idx < max_rerolls:
-                            Actor.log.warning(
-                                f"Soft block/ CAPTCHA ({e}) on engine entry, reroll {reroll_idx+1}/{max_rerolls}")
-                            context = await self.reroll_identity(context, 'yelp', True)
-                            page = await context.new_page()
-                        else:
-                            Actor.log.warning("Natural navigation failed after rerolls, falling back to direct navigation")
-                            break
-                    except Exception as e:
-                        Actor.log.warning(f"Natural navigation failed: {e}, falling back to direct navigation")
-                        break
+                # Run natural navigation but abort after 30 s to avoid whole-actor time-out
+                try:
+                    await asyncio.wait_for(
+                        self._attempt_natural_navigation(page, context, engine_url),
+                        timeout=30.0
+                    )
+                    # success – update referer / target
+                    if page.url != engine_url:
+                        yelp_url = page.url
+                        referer = engine_url
+                        Actor.log.info(f"Natural navigation successful, landed on: {yelp_url}")
+                except asyncio.TimeoutError:
+                    Actor.log.warning(f"Natural navigation via {entry_flow} timed-out (30 s). Using direct navigation.")
+                except Exception as e:
+                    Actor.log.warning(f"Natural navigation failed: {e}. Falling back to direct navigation.")
             
             # If we're not already on a search results page, navigate to the search URL
             if not re.search(r'/search\?', page.url):
@@ -234,6 +202,43 @@ class YelpScraper(BaseScraper):
         search_url = f"https://www.yelp.com/search?find_desc={keyword_clean}&find_loc={location_clean}"
         
         return search_url
+
+    async def _attempt_natural_navigation(
+        self,
+        page: Page,
+        context: BrowserContext,
+        engine_url: str,
+    ) -> None:
+        """
+        Attempt to reach a Yelp result through a search-engine
+        results page. If a Yelp link is not found an exception
+        is raised so the caller can fall back to direct
+        navigation or reroll identity.
+
+        Args:
+            page: Playwright page instance already opened.
+            context: Browser context (unused for now but kept
+                for possible future enhancements such as
+                opening a new tab).
+            engine_url: Fully-formed Google/Bing query URL.
+        """
+        # Navigate to the search engine results page.
+        await self.navigate(page, engine_url)
+
+        # Wait for any Yelp link to appear.
+        yelp_link_selector = 'a[href*="yelp.com"]'
+        await page.wait_for_selector(yelp_link_selector, timeout=10_000)
+
+        # Grab all candidate links.
+        yelp_links = await page.query_selector_all(yelp_link_selector)
+        if not yelp_links:
+            raise Exception("No Yelp links found in search results")
+
+        # Click the first Yelp link.
+        await yelp_links[0].click()
+
+        # Wait for navigation to finish.
+        await page.wait_for_load_state("domcontentloaded")
     
     async def collect_business_links(
         self,
